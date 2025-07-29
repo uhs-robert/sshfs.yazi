@@ -7,12 +7,13 @@
 --   plugin sshfs -- unmount         → choose alias, fusermount ‑u
 --   plugin sshfs -- jump            → jump to an existing mount
 
-local ya = select(1, ...)
+-- local ya = select(1, ...)
 local M = {}
+local PLUGIN_NAME = "sshfs"
 
 --=========== paths ========================================================
 local HOME = os.getenv("HOME")
-local PLUGIN_DIR = HOME .. "/.config/yazi/plugins/sshfs"
+local PLUGIN_DIR = HOME .. "/.config/yazi/plugins/sshfs.yazi"
 local ROOT = HOME .. "/.cache/sshfs" -- mountpoints live here
 local SAVE = PLUGIN_DIR .. "/sshfs.list" -- list of remembered aliases
 
@@ -87,29 +88,122 @@ local function choose(title, items)
 	return idx and items[idx]
 end
 
+---Show an input box.
+---@param title string
+---@param is_password boolean?
+---@param value string?
+---@return string|nil
+local function prompt(title, is_password, value)
+	local input_value, input_event = ya.input({
+		title = title,
+		value = value or "",
+		obscure = is_password or false,
+		pos = { "top-center", y = 0, w = 60 },
+		-- TODO: remove this after next yazi released
+		position = { "top-center", y = 0, w = 60 },
+	})
+
+	if input_event ~= 1 then
+		return nil
+	end
+
+	return input_value
+end
+
+local function error(s, ...)
+	ya.notify({ title = PLUGIN_NAME, content = string.format(s, ...), timeout = 3, level = "error" })
+end
+
+local function info(s, ...)
+	ya.notify({ title = PLUGIN_NAME, content = string.format(s, ...), timeout = 3, level = "info" })
+end
+
+local function read_ssh_config_hosts()
+	local list = {}
+	local f = io.open(HOME .. "/.ssh/config")
+	if not f then
+		return list
+	end
+	for line in f:lines() do
+		local host = line:match("^%s*Host%s+([^%s]+)")
+		if host and host ~= "*" then
+			list[#list + 1] = host
+		end
+	end
+	f:close()
+	return list
+end
+
 --=========== core actions =================================================
 local function cmd_add()
-	local alias, ev = ya.input({ title = "SSH Host alias:", value = "", pos = { "center", w = 48 } })
-	if ev ~= 1 or not alias or alias == "" then
-		return
+	ya.dbg("trying to show prompt")
+	local alias = prompt("SSH Host alias:")
+	if alias == nil then
+		return false
+	elseif alias == "" then
+		error("Alias cannot be empty")
 	end
 	append_line(SAVE, alias)
-	ya.notify({ title = "sshfs", content = "Saved alias " .. alias, timeout = 2 })
+	info("Saved alias “" .. alias .. "”")
 end
 
 local function mount_alias(alias, jump)
 	ensure_dir(ROOT)
-	local mount_path = string.format("%s/%s", ROOT, alias)
-	ensure_dir(mount_path)
-	sh(
-		"sshfs %s: %q -o reconnect,compression=yes,ServerAliveInterval=15,ServerAliveCountMax=3,allow_other -o nonempty &",
+	local mountPoint = string.format("%s/%s", ROOT, alias)
+	ensure_dir(mountPoint)
+
+	------------------------------------------------------------------
+	-- 1. try key / agent authentication (NON‑interactive) ----------
+	------------------------------------------------------------------
+	local base = string.format(
+		"sshfs %s: %q " .. "-o reconnect,compression=yes,ServerAliveInterval=15,ServerAliveCountMax=3" .. "",
 		alias,
-		mount_path
+		mountPoint
 	)
-	ya.notify({ title = "sshfs", content = "Mounting " .. alias, timeout = 1 })
-	if jump then
-		ya.emit("cd", { mount_path, raw = true })
+	local key_probe = base .. " -o BatchMode=yes"
+
+	local _, how, code = os.execute(key_probe)
+	if how == "exit" and code == 0 then -- key auth succeeded
+		info(("Mounted “%s”"):format(alias))
+		if jump then
+			ya.emit("cd", { mountPoint, raw = true })
+		end
+		return
 	end
+	-- code==1  → auth failed, continue to password path
+	-- any other error → abort
+	if how ~= "exit" or code > 1 then
+		error(("sshfs failed (%s,%s)"):format(how, code))
+		return
+	end
+
+	------------------------------------------------------------------
+	-- 2. fall‑back to password auth (three tries)  ------------------
+	------------------------------------------------------------------
+	local MAX = 3
+	for attempt = 1, MAX do
+		local pw = prompt(string.format("Password for %s  (%d/%d):", alias, attempt, MAX), true)
+		if not pw then
+			info("Mount aborted")
+			return
+		end
+
+		-- pass ***exactly*** password + newline
+		local cmd = string.format(" (printf '%%s\\n' %q) | %s -o password_stdin", pw, base)
+
+		local _, how2, code2 = os.execute(cmd)
+		if how2 == "exit" and code2 == 0 then -- success
+			info(string.format("Mounted “%s”", alias))
+			if jump then
+				ya.emit("cd", { mountPoint, raw = true })
+			end
+			return
+		else
+			error("sshfs: authentication failed")
+		end
+	end
+
+	error(string.format("Unable to mount “%s” after %d attempts", alias, MAX))
 end
 
 local function list_mounts()
@@ -126,6 +220,11 @@ end
 local function cmd_mount(args)
 	local jump = args.jump == true
 	local alias_list = read_lines(SAVE)
+	-- Merge alias list from yazi with ssh_config
+	for _, h in ipairs(read_ssh_config_hosts()) do
+		table.insert(alias_list, h)
+	end
+	-- Choose host
 	local chosen_alias = (#alias_list == 1) and alias_list[1] or choose("Mount which host?", alias_list)
 	if chosen_alias then
 		mount_alias(chosen_alias, jump)
@@ -168,24 +267,23 @@ local function cmd_unmount()
 	for _, m in ipairs(mounts) do
 		if m.alias == choice then
 			sh("fusermount -u %q", m.path)
-			ya.notify({ title = "sshfs", content = "Unmounted " .. choice, timeout = 2 })
+			info("Unmounted " .. choice)
 		end
 	end
 end
 
 --=========== public entry ================================================
-function M.setup()
+function M:setup()
 	ensure_dir(ROOT)
 	ensure_dir(PLUGIN_DIR)
 end
 
-function M.entry(job)
+---@param job {args: string[], args: {jump: boolean?, eject: boolean?, force: boolean?}}
+function M:entry(job)
 	local action = job.args[1]
-	if action == "--" then
-		action = job.args[2]
-	end -- safety for keymap parser
 
 	if action == "add" then
+		print("add")
 		cmd_add()
 	elseif action == "mount" then
 		cmd_mount(job.args)
@@ -194,10 +292,10 @@ function M.entry(job)
 	elseif action == "unmount" then
 		cmd_unmount()
 	else
-		ya.notify({ title = "sshfs", content = "Unknown action", level = "error" })
+		error("Unknown action")
 	end
 
-	(ya.render or ui.render)()
+	(ui.render or ya.render)()
 end
 
 return M
