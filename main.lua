@@ -12,7 +12,7 @@ local M = {}
 
 --=========== paths ========================================================
 local HOME = os.getenv("HOME")
-local PLUGIN_DIR = HOME .. "/.config/yazi/plugins/sshfs" -- keep everything self‑contained
+local PLUGIN_DIR = HOME .. "/.config/yazi/plugins/sshfs"
 local ROOT = HOME .. "/.cache/sshfs" -- mountpoints live here
 local SAVE = PLUGIN_DIR .. "/sshfs.list" -- list of remembered aliases
 
@@ -89,11 +89,12 @@ end
 
 --=========== core actions =================================================
 local function cmd_add()
-	local alias = ya.input("SSH Host alias:")
-	if alias and alias ~= "" then
-		append_line(SAVE, alias)
-		ya.notify({ title = "sshfs", content = "Saved alias " .. alias, timeout = 2 })
+	local alias, ev = ya.input({ title = "SSH Host alias:", value = "", pos = { "center", w = 48 } })
+	if ev ~= 1 or not alias or alias == "" then
+		return
 	end
+	append_line(SAVE, alias)
+	ya.notify({ title = "sshfs", content = "Saved alias " .. alias, timeout = 2 })
 end
 
 local function mount_alias(alias, jump)
