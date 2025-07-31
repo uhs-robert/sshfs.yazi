@@ -91,10 +91,11 @@ Add this to your `~/.config/yazi/keymap.toml`:
 ```toml
 [mgr]
 prepend_keymap = [
-  { on = ["M","a"], run = "plugin sshfs -- add",          desc = "Add SSH alias" },
-  { on = ["M","m"], run = "plugin sshfs -- mount --jump", desc = "Mount & jump" },
-  { on = ["M","u"], run = "plugin sshfs -- unmount",      desc = "Unmount SSHFS" },
-  { on = ["g","m"], run = "plugin sshfs -- jump",         desc = "Jump to mount" },
+  { on = ["M","a"], run = "plugin sshfs -- add",             desc = "Add SSH alias" },
+  { on = ["M","r"], run = "plugin sshfs -- remove",          desc = "Remove SSH alias" },
+  { on = ["M","m"], run = "plugin sshfs -- mount --jump",    desc = "Mount & jump" },
+  { on = ["M","u"], run = "plugin sshfs -- unmount",         desc = "Unmount SSHFS" },
+  { on = ["g","m"], run = "plugin sshfs -- jump",            desc = "Jump to mount" },
 ]
 ```
 
