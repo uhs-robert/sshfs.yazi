@@ -88,6 +88,7 @@ local isDebugEnabled = true
 local M = {}
 local PLUGIN_NAME = "sshfs"
 local USER_ID = ya.uid()
+local is_initialized = false
 
 --=========== Paths ===========================================================
 local HOME = os.getenv("HOME")
@@ -681,15 +682,19 @@ local function check_dependencies()
 end
 
 function M:setup()
-	if not check_dependencies() then
-		return
-	end
 	ensure_dir(ROOT)
 	ensure_dir(PLUGIN_DIR)
 end
 
 ---@param job {args: string[], args: {jump: boolean?, eject: boolean?, force: boolean?}}
 function M:entry(job)
+	if not is_initialized then
+		if not check_dependencies() then
+			return
+		end
+		is_initialized = true
+	end
+
 	local action = job.args[1]
 	debug("SSHFS plugin invoked: action = `%s`", action)
 
