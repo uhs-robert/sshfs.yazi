@@ -144,8 +144,9 @@ end
 ---@param cmd string
 ---@param args? string[]
 ---@param input? string  -- optional stdin input (e.g., password)
+---@param is_silent? boolean
 ---@return Error|true|nil, Output|nil
-local function run_command(cmd, args, input)
+local function run_command(cmd, args, input, is_silent)
 	debug("Executing command: " .. cmd .. (args and #args > 0 and (" " .. table.concat(args, " ")) or ""))
 	local msgPrefix = "Command: " .. cmd .. " - "
 	local cmd_obj = Command(cmd)
@@ -169,7 +170,9 @@ local function run_command(cmd, args, input)
 
 	local child, cmd_err = cmd_obj:spawn()
 	if not child then
-		Notify.error(msgPrefix .. "Failed to start. Error: %s", tostring(cmd_err))
+		if not is_silent then
+			Notify.error(msgPrefix .. "Failed to start. Error: %s", tostring(cmd_err))
+		end
 		return cmd_err, nil
 	end
 
@@ -177,13 +180,17 @@ local function run_command(cmd, args, input)
 	if input then
 		local ok, err = child:write_all(input)
 		if not ok then
-			Notify.error(msgPrefix .. "Failed to write, stdin: %s", tostring(err))
+			if not is_silent then
+				Notify.error(msgPrefix .. "Failed to write, stdin: %s", tostring(err))
+			end
 			return err, nil
 		end
 
 		local flushed, flush_err = child:flush()
 		if not flushed then
-			Notify.error(msgPrefix .. "Failed to flush, stdin: %s", tostring(flush_err))
+			if not is_silent then
+				Notify.error(msgPrefix .. "Failed to flush, stdin: %s", tostring(flush_err))
+			end
 			return flush_err, nil
 		end
 	end
@@ -191,18 +198,20 @@ local function run_command(cmd, args, input)
 	-- Read output
 	local output, out_err = child:wait_with_output()
 	if not output then
-		Notify.error(msgPrefix .. "Failed to get output, error: %s", tostring(out_err))
+		if not is_silent then
+			Notify.error(msgPrefix .. "Failed to get output, error: %s", tostring(out_err))
+		end
 		return out_err, nil
 	end
 
 	-- Log outputs
-	if output.stdout ~= "" then
+	if output.stdout ~= "" and not is_silent then
 		debug(msgPrefix, output.stdout)
 	end
-	if output.stderr ~= "" then
+	if output.stderr ~= "" and not is_silent then
 		return true, nil
 	end
-	if output.status and output.status.code ~= 0 then
+	if output.status and output.status.code ~= 0 and not is_silent then
 		Notify.warn(msgPrefix .. "Error code `%s`, success: `%s`", output.status.code, tostring(output.status.success))
 	end
 
