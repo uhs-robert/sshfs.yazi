@@ -12,7 +12,7 @@ Mount any host from your `~/.ssh/config`, or add custom hosts, and browse remote
 
 <!--toc:start-->
 
-- [sshfs.yazi](#sshfs.yazi)
+- [sshfs.yazi](@sshfs.yazi)
   - [Preview](#preview)
   - [Why SSHFS](#why-sshfs)
   - [What it does under the hood](#what-it-does-under-the-hood)
@@ -22,7 +22,6 @@ Mount any host from your `~/.ssh/config`, or add custom hosts, and browse remote
   - [Key Mapping](#key-mapping)
   - [Usage](#usage)
   - [Tips and Performance](#tips-and-performance)
-  - [License](#license)
   <!--toc:end-->
 
 ## Preview
@@ -45,9 +44,9 @@ https://github.com/user-attachments/assets/949c4814-26c0-4ffd-bed5-71581522ed3e
 - **Treat remote files like local ones.** Run `vim`, `nvim`, `sed`, preview images / videos directly, etc.
 - **User‑space, unprivileged.** No root required; mounts live under `~/.cache/sshfs`.
 - **Bandwidth‑friendly.** SSH compression and reconnect options are enabled by default.
-- **Quick Loading and Operations.** SSHFS is fast; load / edit files quickly without lag including all additional functionality from yazi.
+- **Quick Loading and Operations.** Load / edit files quickly without any lag and use all the tools from your local machine.
 
-Perfect for tweaking configs, deploying sites, inspecting logs, or grabbing / editing / deleting files. SSHFS is fast, seamless, and native to your terminal.
+Perfect for tweaking configs, deploying sites, inspecting logs, or just grabbing / editing / deleting files remotely.
 
 ## What it does under the hood
 
@@ -130,7 +129,3 @@ prepend_keymap = [
   ```lua
   sshfs ... -o cache=yes,cache_timeout=300,compression=no ...
   ```
-
-## License
-
-MIT – see `LICENSE`.
