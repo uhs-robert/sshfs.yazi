@@ -1,18 +1,19 @@
 # sshfs.yazi
 
 > A minimal, fast **SSHFS** integration for the [Yazi](https://github.com/sxyazi/yazi) terminal file‑manager.
-> Mount any host you already reach with `ssh`, browse / edit / delete as if the files were local, jump back with a keystroke
+> Mount any host from your `.ssh/config` or add custom ones to yazi. Browse / edit / delete from remote hosts as if the files were local, jump back with a keystroke
 
 <!--toc:start-->
 
 - [sshfs.yazi](#sshfs.yazi)
   - [Preview](#preview)
+  - [Why SSHFS](#why-sshfs)
+  - [What It Does Under the Hood](#what-it-does-under-the-hood)
   - [Features](#features)
   - [Requirements](#requirements)
   - [Installation](#installation)
   - [Key Mapping](#key-mapping)
   - [Usage](#usage)
-  - [Examples](#examples)
   - [Tips](#tips-performance)
   - [License](#license)
   <!--toc:end-->
@@ -22,13 +23,14 @@
 ## Preview
 
 ```text
-M a  → add an SSH alias (Host from ~/.ssh/config)
-M m  → mount alias with sshfs, jump into it
-M u  → unmount (fusermount ‑u)
+M m  → mount a host from your ~/.ssh/config, then jump into it
+M u  → unmount an active mount
 g m  → jump to an active mount
+M a  → add a new custom SSH host to yazi (not saved to your ~/.ssh/config)
+M r  → remove a custom SSH host from yazi
 ```
 
-_(Drop a short GIF or mp4 demo in `assets/` if you like.)_
+_(TODO: Drop a short GIF or mp4 demo in `assets/`.)_
 
 ---
 
@@ -38,18 +40,26 @@ _(Drop a short GIF or mp4 demo in `assets/` if you like.)_
 - **Treat remote files like local ones.** Run `vim`, `nvim`, `sed`, preview images / videos directly, etc.
 - **User‑space, unprivileged.** No root required; mounts live under `~/.cache/sshfs`.
 - **Bandwidth‑friendly.** SSH compression and reconnect options are enabled by default.
-- **Quick Loading and Operations.** SSHFS is fast; load / edit files quickly without lag including bulk operations from yazi.
+- **Quick Loading and Operations.** SSHFS is fast; load / edit files quickly without lag including all additional functionality from yazi.
 
-If you often hop into servers to tweak configs, deploy sites, grab logs, copy media, or delete files then SSHFS provides the perfect middle‑ground between `scp` transfers and a heavyweight sync tool.
+Perfect for tweaking configs, deploying sites, inspecting logs, or grabbing / editing / deleting files. SSHFS is fast, seamless, and native to your terminal.
 
 ---
 
+## What it does under the hood
+
+Basically, just a fancy wrapper for SSHFS that integrates it with Yazi. Reads hosts from your `ssh_config` to choose from. Maintains an optional separate list for yazi hosts as well. The sshfs function used is below:
+
+```sh
+sshfs user@host: ~/.cache/sshfs/alias -o reconnect,compression=yes,ServerAliveInterval=15,ServerAliveCountMax=3
+```
+
 ## Features
 
-- **One‑key mounting** – remembers common SSH hosts.
+- **One‑key mounting** – remembers your SSH hosts and reads from your `ssh_config`.
 - **Jump/Return workflow** – quickly copy files between local & remote.
 - Uses `sshfs` directly.
-- Mount‑points live under `~/.cache/sshfs`, isolated from the rest of the File System.
+- Mount‑points live under `~/.cache/sshfs`, keeping them isolated from your regular file hierarchy.
 
 ---
 
@@ -60,12 +70,13 @@ If you often hop into servers to tweak configs, deploy sites, grab logs, copy me
 | Yazi       | `>=25.5.31`   | tested on 25.6+                     |
 | sshfs      | any           | `sudo dnf/apt/pacman install sshfs` |
 | fusermount | from FUSE     | usually pre-installed               |
-| SSH config | working hosts | aliases come from `~/.ssh/config`   |
+| SSH config | working hosts | hosts come from `~/.ssh/config`     |
 
 > [!NOTE]
 >
 > **This plugin only supports Linux**
-> macOS/BSD users can adapt by swapping the mount/unmount commands.
+>
+> Sorry team, I don't use Mac or Windows! But I am open to a pull request that adds this support! To adapt for macOS or BSD, you'd need to modify the `remove_mountpoint()` logic in `main.lua` to use the appropriate `umount` or `diskutil` commands for your platform. Happy to help explain any of the code if you're up to the challenge!
 
 ---
 
@@ -88,63 +99,53 @@ require("sshfs"):setup()
 
 Add this to your `~/.config/yazi/keymap.toml`:
 
+Feel free to change the main modifier (`M`) or any of the other key map letters. You're the boss here!
+
 ```toml
 [mgr]
 prepend_keymap = [
-  { on = ["M","a"], run = "plugin sshfs -- add",             desc = "Add SSH alias" },
-  { on = ["M","r"], run = "plugin sshfs -- remove",          desc = "Remove SSH alias" },
+  { on = ["M","a"], run = "plugin sshfs -- add",             desc = "Add SSH host" },
+  { on = ["M","r"], run = "plugin sshfs -- remove",          desc = "Remove SSH host" },
   { on = ["M","m"], run = "plugin sshfs -- mount --jump",    desc = "Mount & jump" },
   { on = ["M","u"], run = "plugin sshfs -- unmount",         desc = "Unmount SSHFS" },
   { on = ["g","m"], run = "plugin sshfs -- jump",            desc = "Jump to mount" },
 ]
 ```
 
-Feel free to change the main modifier (`M`) or any of the other key map letters.
+Not required, but I would highly encourage adding this one too. This plugin pulls from your `ssh_config` so being able to quickly edit it is quite handy.
+
+```toml
+[mgr]
+prepend_keymap = [
+  { on = [
+    "M",
+    "c",
+  ], run = "cd ~/.ssh/", desc = "Go to ssh config" },
+]
+```
 
 ---
 
 ## Usage
 
-1. **Add** – press `M a`, enter an alias from `~/.ssh/config` (e.g. `prod`). The alias is stored in `~/.config/yazi/plugins/sshfs/sshfs.list`.
-2. **Mount** – press `M m`. If there’s only one alias it mounts immediately, otherwise pick from the list.
-3. **Jump** – Yazi automatically `cd`s into the mount directory (`~/.cache/sshfs/ALIAS`).
-4. **Return** – press `g m` to jump back to any active mount.
-5. **Unmount** – press `M u`, choose the alias to unmount.
-
----
-
-## Examples
-
-### Command‑line equivalent
-
-```sh
-# what the plugin runs under the hood
-sshfs prod: ~/.cache/sshfs/prod -o reconnect,compression=yes,allow_other -o nonempty &
-
-# unmount manually
-fusermount -u ~/.cache/sshfs/prod
-```
-
-### Multiple hosts workflow
-
-1. Add `web`, `db`, `backup` via `M a`.
-2. `M m` → choose `web`, Yazi jumps into `/home/user/.cache/sshfs/web`.
-3. Copy a config file to local, edit, paste back.
-4. `g m` → choose `db`, inspect logs.
-5. `M u` → pick `backup` after finishing cleanup.
+1. **Mount** – press `M m`, choose the host to mount. You'll then be prompted to select whether to land in the home directory `~` or root `/`. This includes both hosts from your `ssh_config` and any manually added hosts.
+2. **Add** – press `M a`, enter a manual custom host (e.g. `username@example.domain.com`) to save for mount. Manual hosts must be valid SSH targets like `user@host`. These hosts are not stored in your `ssh_config` and are instead kept separately in `~/.config/yazi/plugins/sshfs/sshfs.list`.
+3. **Remove** – press `M r`, select a manually added custom host to remove. This removes the host from `~/.config/yazi/plugins/sshfs/sshfs.list`.
+4. **Jump** – Yazi automatically `cd`s into a mounted directory.
+5. **Return** – press `g m` to jump back to any active mount.
+6. **Unmount** – press `M u`, choose the host to unmount.
 
 ---
 
 ## Tips & Performance
 
-- Edit the mount flags in `main.lua` to enable caching:
+- If key authentication fails, the plugin will prompt for a password up to 3 times before giving up.
+- SSH keys vastly speed up repeated mounts (no password prompt), leverage your `ssh_config` rather than manually adding hosts to make this as easy as possible.
+- You can edit the mount flags in `main.lua` to enable caching:
 
   ```lua
   sshfs ... -o cache=yes,cache_timeout=300,compression=no ...
   ```
-
-- If you see _“Transport endpoint is not connected”_ simply unmount then mount again.
-- SSH keys + agent vastly speed up repeated mounts (no password prompt).
 
 ---
 
