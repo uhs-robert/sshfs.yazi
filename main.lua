@@ -432,7 +432,9 @@ end
 ---Tries sshfs via key authentication
 ---@param alias string
 ---@param mountPoint string
-local function try_key_auth(alias, mountPoint)
+---@param mount_to_root boolean
+local function try_key_auth(alias, mountPoint, mount_to_root)
+	mount_to_root = mount_to_root or false
 	local options = {
 		"BatchMode=yes",
 		"reconnect",
@@ -440,8 +442,9 @@ local function try_key_auth(alias, mountPoint)
 		"ServerAliveInterval=15",
 		"ServerAliveCountMax=3",
 	}
+	local remote_path = alias .. ":" .. (mount_to_root and "/" or "")
 	local args = {
-		alias .. ":",
+		remote_path,
 		mountPoint,
 		"-o",
 		table.concat(options, ","),
@@ -452,9 +455,11 @@ end
 ---Tries sshfs via password input, with retries allowed
 ---@param alias string
 ---@param mountPoint string
+---@param mount_to_root boolean
 ---@param max_attempts? integer
 ---@return boolean? result, string? reason
-local function try_password_auth(alias, mountPoint, max_attempts)
+local function try_password_auth(alias, mountPoint, mount_to_root, max_attempts)
+	mount_to_root = mount_to_root or false
 	max_attempts = max_attempts or 3
 	local options = {
 		"password_stdin",
@@ -463,6 +468,7 @@ local function try_password_auth(alias, mountPoint, max_attempts)
 		"ServerAliveInterval=15",
 		"ServerAliveCountMax=3",
 	}
+	local remote_path = alias .. ":" .. (mount_to_root and "/" or "")
 
 	for attempt = 1, max_attempts do
 		local pw = prompt(("Password for %s (%d/%d):"):format(alias, attempt, max_attempts), true)
@@ -471,7 +477,7 @@ local function try_password_auth(alias, mountPoint, max_attempts)
 		end
 
 		local args = {
-			alias .. ":",
+			remote_path,
 			mountPoint,
 			"-o",
 			table.concat(options, ","),
@@ -508,16 +514,27 @@ local function add_mountpoint(alias, jump)
 	local mountPoint = ("%s/%s"):format(ROOT, alias)
 	ensure_dir(mountPoint)
 
+	-- If already exists, jump to it
 	if is_mount_active(Url(mountPoint)) then
 		return finalize_mount(alias, mountPoint, jump)
 	end
 
-	local err, _ = try_key_auth(alias, mountPoint)
+	-- Ask user to go to home or root folder
+	local mount_to_root = ya.which({
+		title = "Mount where?",
+		cands = {
+			{ on = "1", desc = "Home directory (~)" },
+			{ on = "2", desc = "Root directory (/)" },
+		},
+	}) == 2
+
+	-- Try key authentication then try password if it fails
+	local err, _ = try_key_auth(alias, mountPoint, mount_to_root)
 	if not err then
 		return finalize_mount(alias, mountPoint, jump)
 	end
 
-	local ok, reason = try_password_auth(alias, mountPoint)
+	local ok, reason = try_password_auth(alias, mountPoint, mount_to_root)
 	if ok then
 		return finalize_mount(alias, mountPoint, jump)
 	elseif ok == false then
