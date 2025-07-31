@@ -662,7 +662,19 @@ local function cmd_unmount()
 end
 
 --=========== public entry ================================================
+local function check_dependencies()
+	local err, _ = run_command("command", { "-v", "sshfs" })
+	if err then
+		Notify.error("sshfs is not installed or not in PATH")
+		return false
+	end
+	return true
+end
+
 function M:setup()
+	if not check_dependencies() then
+		return
+	end
 	ensure_dir(ROOT)
 	ensure_dir(PLUGIN_DIR)
 end
