@@ -25,8 +25,6 @@ Mount any host from your `~/.ssh/config`, or add custom hosts, and browse remote
   - [License](#license)
   <!--toc:end-->
 
----
-
 ## Preview
 
 ```text
@@ -37,9 +35,9 @@ M a  → Add a new custom SSH host
 M r  → Remove a custom SSH host
 ```
 
-_(TODO: Drop a short GIF or mp4 demo in `assets/`.)_
 
----
+https://github.com/user-attachments/assets/949c4814-26c0-4ffd-bed5-71581522ed3e
+
 
 ## Why SSHFS?
 
@@ -50,8 +48,6 @@ _(TODO: Drop a short GIF or mp4 demo in `assets/`.)_
 - **Quick Loading and Operations.** SSHFS is fast; load / edit files quickly without lag including all additional functionality from yazi.
 
 Perfect for tweaking configs, deploying sites, inspecting logs, or grabbing / editing / deleting files. SSHFS is fast, seamless, and native to your terminal.
-
----
 
 ## What it does under the hood
 
@@ -68,8 +64,6 @@ sshfs user@host: ~/.cache/sshfs/alias -o reconnect,compression=yes,ServerAliveIn
 - Uses `sshfs` directly.
 - Mount‑points live under `~/.cache/sshfs`, keeping them isolated from your regular file hierarchy.
 
----
-
 ## Requirements
 
 | Software   | Minimum       | Notes                               |
@@ -78,8 +72,6 @@ sshfs user@host: ~/.cache/sshfs/alias -o reconnect,compression=yes,ServerAliveIn
 | sshfs      | any           | `sudo dnf/apt/pacman install sshfs` |
 | fusermount | from FUSE     | Usually pre-installed on Linux      |
 | SSH config | working hosts | Hosts come from `~/.ssh/config`     |
-
----
 
 ## Installation
 
@@ -93,8 +85,6 @@ Modify your `~/.config/yazi/init.lua` to include:
 ```lua
 require("sshfs"):setup()
 ```
-
----
 
 ## Key Mapping
 
@@ -123,8 +113,6 @@ prepend_keymap = [
 ]
 ```
 
----
-
 ## Usage
 
 - **Mount (`M m``):** Choose a host and select a remote directory (`~` or `/`). This works for hosts from your`~/.ssh/config` and any custom hosts you've added.
@@ -132,8 +120,6 @@ prepend_keymap = [
 - **Remove host (`M r`):** Select and remove any added custom hosts.
 - **Jump to mount (`g m`):** Jump to any active mount from another tab or location.
 - **Unmount (`M u`):** Choose an active mount to unmount it.
-
----
 
 ## Tips and Performance
 
@@ -145,9 +131,6 @@ prepend_keymap = [
   sshfs ... -o cache=yes,cache_timeout=300,compression=no ...
   ```
 
----
-
 ## License
 
 MIT – see `LICENSE`.
-
