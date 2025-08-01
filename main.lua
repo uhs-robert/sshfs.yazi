@@ -95,7 +95,15 @@ local HOME = os.getenv("HOME")
 local PLUGIN_DIR = HOME .. "/.config/yazi/plugins/sshfs.yazi"
 local ROOT = HOME .. "/.cache/sshfs" -- mountpoints live here
 local SAVE = PLUGIN_DIR .. "/sshfs.list" -- list of remembered aliases
+local SSH_CONFIG = HOME .. "/.ssh/config"
 local XDG_RUNTIME_DIR = os.getenv("XDG_RUNTIME_DIR") or ("/run/user/" .. USER_ID)
+
+--=========== Host Cache ======================================================
+local host_cache = {
+	hosts = nil,
+	ssh_config_mtime = 0,
+	save_file_mtime = 0,
+}
 
 --================= Notify / Logger ===========================================
 local Notify = {}
@@ -273,6 +281,15 @@ local read_lines = ya.sync(function(_, path)
 	return lines
 end)
 
+---Get file modification time
+---@param path string
+---@return integer
+local function get_file_mtime(path)
+	local url = Url(path)
+	local cha = fs.cha(url)
+	return cha and cha.mtime or 0
+end
+
 ---Redirect all tabs in mounted dir to home
 ---@param unmounted_url string
 local redirect_unmounted_tabs_to_home = ya.sync(function(_, unmounted_url)
@@ -364,7 +381,7 @@ end
 
 local function read_ssh_config_hosts()
 	local list = {}
-	local f = io.open(HOME .. "/.ssh/config")
+	local f = io.open(SSH_CONFIG)
 	if not f then
 		return list
 	end
@@ -377,6 +394,41 @@ local function read_ssh_config_hosts()
 	end
 	f:close()
 	return list
+end
+
+---Check if host cache is valid by comparing file modification times
+---@return boolean
+local function is_host_cache_valid()
+	local ssh_config_mtime = get_file_mtime(SSH_CONFIG)
+	local save_file_mtime = get_file_mtime(SAVE)
+
+	return (
+		host_cache.hosts ~= nil
+		and host_cache.ssh_config_mtime == ssh_config_mtime
+		and host_cache.save_file_mtime == save_file_mtime
+	)
+end
+
+---Update host cache with current file modification times
+local function update_host_cache(hosts)
+	local ssh_config_mtime = get_file_mtime(SSH_CONFIG)
+	local save_file_mtime = get_file_mtime(SAVE)
+
+	host_cache.hosts = hosts
+	host_cache.ssh_config_mtime = ssh_config_mtime
+	host_cache.save_file_mtime = save_file_mtime
+end
+
+---Get list of all available hosts (from SSH config and custom list)
+---@return string[]
+local function get_all_hosts()
+	if is_host_cache_valid() then
+		return host_cache.hosts
+	end
+
+	local hosts = unique(list_extend(read_lines(SAVE), read_ssh_config_hosts()))
+	update_host_cache(hosts)
+	return hosts
 end
 
 ---Check if a mount point is actively mounted
@@ -565,10 +617,14 @@ local function cmd_add_alias()
 	end
 	append_line(SAVE, alias)
 	debug("Saved host alias `%s`", alias)
+
+	-- Invalidate cache since we modified the save file
+	host_cache.hosts = nil
+	host_cache.save_file_mtime = 0
 end
 
 local function cmd_remove_alias()
-	local saved_aliases = unique(read_lines(SAVE))
+	local saved_aliases = read_lines(SAVE)
 	local alias = choose("Remove which?", saved_aliases)
 	if not alias then
 		return
@@ -593,13 +649,17 @@ local function cmd_remove_alias()
 	end
 	file:close()
 
+	-- Invalidate cache since we modified the save file
+	host_cache.hosts = nil
+	host_cache.save_file_mtime = 0
+
 	Notify.info(("Alias “%s” removed from saved list"):format(alias))
 end
 
 local function cmd_mount(args)
 	-- Get alias_list
 	local jump = args.jump == true
-	local alias_list = unique(list_extend(read_lines(SAVE), read_ssh_config_hosts()))
+	local alias_list = get_all_hosts()
 
 	-- Choose alias to mount then add it
 	local chosen_alias = (#alias_list == 1) and alias_list[1] or choose("Mount which host?", alias_list)
@@ -662,7 +722,6 @@ local function cmd_unmount()
 	end
 
 	-- unmount it
-
 	redirect_unmounted_tabs_to_home(mp)
 	if remove_mountpoint(mp) then
 		Notify.info("Unmounted “" .. alias .. "”")
