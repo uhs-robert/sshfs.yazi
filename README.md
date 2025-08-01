@@ -34,7 +34,8 @@ M a  → Add a new custom SSH host
 M r  → Remove a custom SSH host
 ```
 
-https://github.com/user-attachments/assets/a7201b01-d1bd-431f-937c-6848cb144bd8
+https://github.com/user-attachments/assets/b7ef109a-0941-4879-b15a-a343262f0967
+
 
 ## Why SSHFS?
 
