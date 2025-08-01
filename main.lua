@@ -88,15 +88,15 @@ local isDebugEnabled = true
 local M = {}
 local PLUGIN_NAME = "sshfs"
 local USER_ID = ya.uid()
+local XDG_RUNTIME_DIR = os.getenv("XDG_RUNTIME_DIR") or ("/run/user/" .. USER_ID)
 local is_initialized = false
 
 --=========== Paths ===========================================================
 local HOME = os.getenv("HOME")
-local PLUGIN_DIR = HOME .. "/.config/yazi/plugins/sshfs.yazi"
-local ROOT = HOME .. "/.cache/sshfs" -- mountpoints live here
-local SAVE = PLUGIN_DIR .. "/sshfs.list" -- list of remembered aliases
 local SSH_CONFIG = HOME .. "/.ssh/config"
-local XDG_RUNTIME_DIR = os.getenv("XDG_RUNTIME_DIR") or ("/run/user/" .. USER_ID)
+local PLUGIN_DIR = HOME .. "/.config/yazi/plugins/sshfs.yazi"
+local MOUNT_DIR = HOME .. "/mnt" -- mountpoints live here
+local SAVE = PLUGIN_DIR .. "/sshfs.list" -- list of remembered aliases
 
 --=========== Host Cache ======================================================
 local host_cache = {
@@ -107,7 +107,6 @@ local host_cache = {
 
 --================= Notify / Logger ===========================================
 local Notify = {}
-
 ---@param level "info"|"warn"|"error"|nil
 ---@param s string
 ---@param ... any
@@ -475,7 +474,7 @@ local function is_mount_active(path, url)
 		return not is_dir_empty(url)
 	end
 
-	local mounts = parse_sshfs_mounts(output.stdout, ROOT)
+	local mounts = parse_sshfs_mounts(output.stdout, MOUNT_DIR)
 	for _, mounted_path in ipairs(mounts) do
 		if mounted_path == path then
 			return true
@@ -493,9 +492,9 @@ local function list_mounts()
 	local mountErr, output = run_command("mount", nil, nil, true) --silent
 	if mountErr or not output then
 		debug("Failed to get mount info in list_mounts(), falling back to directory scan")
-		local files, err = fs.read_dir(Url(ROOT), { resolve = false })
+		local files, err = fs.read_dir(Url(MOUNT_DIR), { resolve = false })
 		if not files then
-			debug("No files in ROOT dir: %s", tostring(err))
+			debug("No files in MOUNT_DIR dir: %s", tostring(err))
 			return mounts
 		end
 
@@ -509,7 +508,7 @@ local function list_mounts()
 			end
 		end
 	else
-		for _, path in ipairs(parse_sshfs_mounts(output.stdout, ROOT)) do
+		for _, path in ipairs(parse_sshfs_mounts(output.stdout, MOUNT_DIR)) do
 			local alias = path:match("([^/]+)$")
 			if alias then
 				debug("Active mount: %s", path)
@@ -536,7 +535,7 @@ local function remove_mountpoint(mp)
 		local command, args = cmd[1], cmd[2]
 		local err, _ = run_command(command, args, nil, true) -- silent
 		if not err then
-			fs.remove("dir", Url(mp)) -- clean up the empty dir
+			fs.remove("dir_clean", Url(mp)) -- clean the empty dir
 			return true
 		end
 	end
@@ -626,8 +625,8 @@ end
 ---@param jump boolean
 local function add_mountpoint(alias, jump)
 	debug("Adding mountpoint: `%s`", alias)
-	ensure_dir(Url(ROOT))
-	local mountPoint = ("%s/%s"):format(ROOT, alias)
+	ensure_dir(Url(MOUNT_DIR))
+	local mountPoint = ("%s/%s"):format(MOUNT_DIR, alias)
 	local mountUrl = Url(mountPoint)
 	ensure_dir(mountUrl)
 
@@ -659,6 +658,9 @@ local function add_mountpoint(alias, jump)
 	else
 		debug("Aborted: " .. (reason or "user cancelled"))
 	end
+
+	-- error or abort clean up
+	fs.remove("dir_clean", mountUrl) -- clean empty dir
 end
 
 --=========== api actions =================================================
@@ -816,8 +818,8 @@ local function check_dependencies()
 	return true
 end
 
-local function check_has_root()
-	return ensure_dir(Url(ROOT))
+local function check_has_mount_dir()
+	return ensure_dir(Url(MOUNT_DIR))
 end
 
 local function check_has_sshfs_list()
@@ -843,8 +845,8 @@ function M:entry(job)
 		if not check_dependencies() then
 			return Notify.error("Missing sshfs dependency, please install sshfs and try again...")
 		end
-		if not check_has_root() then
-			return Notify.error("Unable to create the Root Directory")
+		if not check_has_mount_dir() then
+			return Notify.error("Unable to create the Mount directory")
 		end
 		if not check_has_sshfs_list() then
 			return Notify.error("Unable to create the sshfs.list file in plugin directory")
