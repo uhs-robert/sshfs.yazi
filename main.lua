@@ -599,7 +599,7 @@ local function try_password_auth(alias, mountPoint, mount_to_root, max_attempts)
 			table.concat(options, ","),
 		}
 
-		local err, _ = run_command("sshfs", args, pw .. "\n")
+		local err, _ = run_command("sshfs", args, pw .. "\n", true) --silent
 		if err then
 			Notify.error("sshfs: authentication failed")
 		else
