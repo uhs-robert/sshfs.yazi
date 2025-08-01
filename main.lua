@@ -84,7 +84,7 @@ ya = ya or {}
 ---@field message string
 
 --=========== Plugin Settings =================================================
-local isDebugEnabled = true
+local isDebugEnabled = false
 local M = {}
 local PLUGIN_NAME = "sshfs"
 local USER_ID = ya.uid()
