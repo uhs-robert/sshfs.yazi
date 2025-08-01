@@ -536,6 +536,7 @@ local function remove_mountpoint(mp)
 		local command, args = cmd[1], cmd[2]
 		local err, _ = run_command(command, args, nil, true) -- silent
 		if not err then
+			fs.remove("dir", Url(mp)) -- clean up the empty dir
 			return true
 		end
 	end
