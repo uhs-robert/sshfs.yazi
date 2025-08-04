@@ -41,7 +41,7 @@ https://github.com/user-attachments/assets/b7ef109a-0941-4879-b15a-a343262f0967
 
 - **Works anywhere you have SSH access.** No VPN, NFS or Samba needed – only port 22.
 - **Treat remote files like local ones.** Run `vim`, `nvim`, `sed`, preview images / videos directly, etc.
-- **User‑space, unprivileged.** No root required; mounts live under `~/.cache/sshfs`.
+- **User‑space, unprivileged.** No root required; mounts live under `~/mnt`.
 - **Bandwidth‑friendly.** SSH compression and reconnect options are enabled by default.
 - **Quick Loading and Operations.** Load / edit files quickly without any lag and use all the tools from your local machine.
 
@@ -49,10 +49,10 @@ Perfect for tweaking configs, deploying sites, inspecting logs, or just grabbing
 
 ## What it does under the hood
 
-This plugin serves as a wrapper for the `sshfs` command, integrating it seamlessly with Yazi. It automatically reads hosts from your `~/.ssh/config` file. Additionally, it maintains a separate list of custom hosts in `~/.config/yazi/plugins/sshfs.yazi/sshfs.list`. The core `sshfs` command used is:
+This plugin serves as a wrapper for the `sshfs` command, integrating it seamlessly with Yazi. It automatically reads hosts from your `~/.ssh/config` file. Additionally, it maintains a separate list of custom hosts in `~/.config/yazi/sshfs.list`. The core `sshfs` command used is:
 
 ```sh
-sshfs user@host: ~/.cache/sshfs/alias -o reconnect,compression=yes,ServerAliveInterval=15,ServerAliveCountMax=3
+sshfs user@host: ~/mnt/alias -o reconnect,compression=yes,ServerAliveInterval=15,ServerAliveCountMax=3
 ```
 
 ## Features
@@ -60,7 +60,7 @@ sshfs user@host: ~/.cache/sshfs/alias -o reconnect,compression=yes,ServerAliveIn
 - **One‑key mounting** – remembers your SSH hosts and reads from your `ssh_config`.
 - **Jump/Return workflow** – quickly copy files between local & remote.
 - Uses `sshfs` directly.
-- Mount‑points live under `~/.cache/sshfs`, keeping them isolated from your regular file hierarchy.
+- Mount‑points live under `~/mnt`, keeping them isolated from your regular file hierarchy.
 
 ## Requirements
 
