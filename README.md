@@ -40,7 +40,7 @@ M r  → Remove a custom SSH host
 
 - **Works anywhere you have SSH access.** No VPN, NFS or Samba needed – only port 22.
 - **Treat remote files like local ones.** Run `vim`, `nvim`, `sed`, preview images / videos directly, etc.
-- **User‑space, unprivileged.** No root required; mounts live under `~/mnt`.
+- **User‑space, unprivileged.** No root required; mounts live under your chosen mount directory or the default (`~/mnt`).
 - **Bandwidth‑friendly.** SSH compression and reconnect options are enabled by default.
 - **Quick Loading and Operations.** Load / edit files quickly without any lag and use all the tools from your local machine.
 
@@ -50,7 +50,7 @@ Perfect for tweaking configs, deploying sites, inspecting logs, or just grabbing
 
 This plugin serves as a wrapper for the `sshfs` command, integrating it seamlessly with Yazi. It automatically reads hosts from your `~/.ssh/config` file. Additionally, it maintains a separate list of custom hosts in `~/.config/yazi/sshfs.list`.
 
-The core default `sshfs` command used is as follows (you may tweak these options with your setup settings):
+The core default `sshfs` command used is as follows (you may tweak these options and the mount directory with your setup settings):
 
 ```sh
 sshfs user@host: ~/mnt/alias -o reconnect,compression=yes,ServerAliveInterval=15,ServerAliveCountMax=3
@@ -61,7 +61,7 @@ sshfs user@host: ~/mnt/alias -o reconnect,compression=yes,ServerAliveInterval=15
 - **One‑key mounting** – remembers your SSH hosts and reads from your `ssh_config`.
 - **Jump/Return workflow** – quickly copy files between local & remote.
 - Uses `sshfs` directly.
-- Mount‑points live under `~/mnt`, keeping them isolated from your regular file hierarchy.
+- Mount‑points live under your chosen mount directory (default: `~/mnt`), keeping them isolated from your regular file hierarchy.
 
 ## Requirements
 
@@ -100,7 +100,7 @@ prepend_keymap = [
 ]
 ```
 
-Not required, but I would highly encourage adding this one too. This plugin pulls from your `ssh_config` so being able to quickly edit it is quite handy.
+Not required, but I would highly encourage adding this one too. This plugin pulls from your `ssh_config`, so being able to quickly edit it is quite handy.
 
 ```toml
 [mgr]
@@ -122,7 +122,7 @@ To run with default settings, use this:
 require("sshfs"):setup()
 ```
 
-Otherwise you may configure your settings as follows (default settings displayed):
+Otherwise, you may configure your settings as follows (default settings displayed):
 
 ```lua
 require("sshfs"):setup({
