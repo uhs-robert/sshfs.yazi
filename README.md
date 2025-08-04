@@ -114,8 +114,8 @@ prepend_keymap = [
 ## Usage
 
 - **Mount (`M m`):** Choose a host and select a remote directory (`~` or `/`). This works for hosts from your`~/.ssh/config` and any custom hosts you've added.
-- **Add host (`M a`):** Enter a custom host (`user@host`) to save it for future mounts.
-- **Remove host (`M r`):** Select and remove any added custom hosts.
+- **Add host (`M a`):** Enter a custom host (`user@host`) for Yazi-only use (useful for quick testing or temp setups). For persistent, system-wide access, updating your  `.ssh/config` is recommended.
+- **Remove host (`M r`):** Select and remove any Yazi-only hosts that you've added.
 - **Jump to mount (`g m`):** Jump to any active mount from another tab or location.
 - **Unmount (`M u`):** Choose an active mount to unmount it.
 
