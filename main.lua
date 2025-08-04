@@ -84,12 +84,11 @@ ya = ya or {}
 ---@field message string
 
 --=========== Plugin Settings =================================================
-local isDebugEnabled = true
+local isDebugEnabled = false
 local M = {}
 local PLUGIN_NAME = "sshfs"
 local USER_ID = ya.uid()
 local XDG_RUNTIME_DIR = os.getenv("XDG_RUNTIME_DIR") or ("/run/user/" .. USER_ID)
-local is_initialized = false
 
 --=========== Paths ===========================================================
 local HOME = os.getenv("HOME")
@@ -97,6 +96,12 @@ local SSH_CONFIG = HOME .. "/.ssh/config"
 local YAZI_DIR = HOME .. "/.config/yazi"
 local SAVE_LIST = YAZI_DIR .. "/sshfs.list" -- list of remembered aliases
 local MOUNT_DIR = HOME .. "/mnt" -- mountpoints live here
+
+--=========== Plugin State ===========================================================
+---@enum
+local STATE_KEY = {
+	SSH_OPTIONS = "SSH_OPTIONS",
+}
 
 --=========== Host Cache ======================================================
 local host_cache = {
@@ -232,6 +237,14 @@ local function run_command(cmd, args, input, is_silent)
 end
 
 --========= Sync helpers =======================================================
+local set_state = ya.sync(function(state, key, value)
+	state[key] = value
+end)
+
+local get_state = ya.sync(function(state, key)
+	return state[key]
+end)
+
 ---Append a single line to a text file, creating the parent dir if needed.
 ---@param path string
 ---@param line string
@@ -544,19 +557,49 @@ local function remove_mountpoint(mp)
 end
 
 --======== Mount functions ============================================
+---Get sshfs user config options
+---@param type "key"|"password"
+local function getConfigForSSHFS(type)
+	local ssh_options = get_state(STATE_KEY.SSH_OPTIONS)
+	if not ssh_options then
+		return {}
+	end
+	-- General options
+	local options = {
+		"reconnect",
+		string.format("compression=%s", ssh_options.compression and "yes" or "no"),
+		string.format("ServerAliveInterval=%d", ssh_options.server_alive_interval),
+		string.format("ServerAliveCountMax=%d", ssh_options.server_alive_count_max),
+	}
+
+	-- Handle cache options
+	if ssh_options.dir_cache then
+		for _, opt in ipairs({
+			"dir_cache=yes",
+			string.format("dcache_timeout=%d", ssh_options.dcache_timeout),
+			string.format("dcache_max_size=%d", ssh_options.dcache_max_size),
+		}) do
+			table.insert(options, opt)
+		end
+	end
+
+	-- Handle key vs password auth
+	if type == "key" then
+		table.insert(options, "BatchMode=yes")
+	else
+		table.insert(options, "password_stdin")
+	end
+
+	return options
+end
+
 ---Tries sshfs via key authentication
 ---@param alias string
 ---@param mountPoint string
 ---@param mount_to_root boolean
 local function try_key_auth(alias, mountPoint, mount_to_root)
 	mount_to_root = mount_to_root or false
-	local options = {
-		"BatchMode=yes",
-		"reconnect",
-		"compression=yes",
-		"ServerAliveInterval=15",
-		"ServerAliveCountMax=3",
-	}
+	local options = getConfigForSSHFS("key")
 	local remote_path = alias .. ":" .. (mount_to_root and "/" or "")
 	local args = {
 		remote_path,
@@ -576,13 +619,7 @@ end
 local function try_password_auth(alias, mountPoint, mount_to_root, max_attempts)
 	mount_to_root = mount_to_root or false
 	max_attempts = max_attempts or 3
-	local options = {
-		"password_stdin",
-		"reconnect",
-		"compression=yes",
-		"ServerAliveInterval=15",
-		"ServerAliveCountMax=3",
-	}
+	local options = getConfigForSSHFS("password")
 	local remote_path = alias .. ":" .. (mount_to_root and "/" or "")
 
 	for attempt = 1, max_attempts do
@@ -808,7 +845,8 @@ local function cmd_unmount()
 	end
 end
 
---=========== public entry ================================================
+--=========== init requirements ================================================
+---Verify all dependencies
 local function check_dependencies()
 	local err, _ = run_command("command", { "-v", "sshfs" })
 	if err then
@@ -818,10 +856,12 @@ local function check_dependencies()
 	return true
 end
 
+---Verify mount dir exists
 local function check_has_mount_dir()
 	return ensure_dir(Url(MOUNT_DIR))
 end
 
+---Verify sshfs.list exists
 local function check_has_sshfs_list()
 	local url = Url(SAVE_LIST)
 	local cha, _ = fs.cha(url)
@@ -835,27 +875,66 @@ local function check_has_sshfs_list()
 	return false
 end
 
-function M:setup()
-	debug("SSHFS Setup Complete")
-end
-
----@param job {args: string[], args: {jump: boolean?, eject: boolean?, force: boolean?}}
-function M:entry(job)
-	if not is_initialized then
+---Initialize the plugin, verify all dependencies
+local function init()
+	local initialized = get_state("is_initialized")
+	if not initialized then
 		if not check_dependencies() then
-			return Notify.error("Missing sshfs dependency, please install sshfs and try again...")
+			Notify.error("Missing sshfs dependency, please install sshfs and try again...")
+			return false
 		end
 		if not check_has_mount_dir() then
-			return Notify.error("Unable to create the Mount directory")
+			Notify.error("Could not create mount directory")
+			return false
 		end
 		if not check_has_sshfs_list() then
-			return Notify.error("Unable to create the sshfs.list file in plugin directory")
+			Notify.error("Could not create sshfs.list")
+			return false
 		end
-		is_initialized = true
+		initialized = true
+		set_state("is_initialized", true)
+	end
+	return initialized
+end
+
+--=========== Plugin start =================================================
+-- Default configuration
+local default_config = {
+	compression = true,
+	server_alive_interval = 15,
+	server_alive_count_max = 3,
+	dir_cache = false,
+	dcache_timeout = 300,
+	dcache_max_size = 10000,
+}
+
+---Merges user‑provided config into the defaults.
+---@param user_config table|nil
+local function set_user_config(user_config)
+	local ssh_options = {}
+	for k, v in pairs(default_config) do
+		ssh_options[k] = v
+	end
+	for k, v in pairs(user_config or {}) do
+		if ssh_options[k] ~= nil and type(ssh_options[k]) == type(v) then
+			ssh_options[k] = v
+		end
+	end
+	set_state(STATE_KEY.SSH_OPTIONS, ssh_options)
+end
+
+---Setup
+function M:setup(cfg)
+	set_user_config(cfg)
+end
+
+---Entry
+function M:entry(job)
+	if not init() then
+		return
 	end
 
 	local action = job.args[1]
-	debug("SSHFS plugin invoked: action = `%s`", action)
 	if action == "add" then
 		cmd_add_alias()
 	elseif action == "remove" then
@@ -869,8 +948,6 @@ function M:entry(job)
 	else
 		Notify.error("Unknown action")
 	end
-
-	debug("Finished running action: `%s`", action)
 end
 
 return M

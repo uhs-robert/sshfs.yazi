@@ -111,6 +111,40 @@ prepend_keymap = [
 ]
 ```
 
+## Configuration
+
+To configure the plugin, you can pass a table to the `setup()` function in your `init.lua`. The following options are available:
+
+```lua
+require("sshfs"):setup({
+  -- Enable or disable compression.
+  -- Default: true
+  compression = true,
+
+  -- Interval to send keep-alive messages to the server.
+  -- Default: 15
+  server_alive_interval = 15,
+
+  -- Number of keep-alive messages to send before disconnecting.
+  -- Default: 3
+  server_alive_count_max = 3,
+
+  -- Enable or disable directory caching.
+  -- Default: false
+  dir_cache = false,
+
+  -- Directory cache timeout in seconds.
+  -- Only applies if dir_cache is enabled.
+  -- Default: 300
+  dcache_timeout = 300,
+
+  -- Maximum size of the directory cache.
+  -- Only applies if dir_cache is enabled.
+  -- Default: 10000
+  dcache_max_size = 10000,
+})
+```
+
 ## Usage
 
 - **Mount (`M m`):** Choose a host and select a remote directory (`~` or `/`). This works for hosts from your`~/.ssh/config` and any custom hosts you've added.
