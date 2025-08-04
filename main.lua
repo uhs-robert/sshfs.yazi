@@ -94,9 +94,9 @@ local is_initialized = false
 --=========== Paths ===========================================================
 local HOME = os.getenv("HOME")
 local SSH_CONFIG = HOME .. "/.ssh/config"
-local PLUGIN_DIR = HOME .. "/.config/yazi/plugins/sshfs.yazi"
+local YAZI_DIR = HOME .. "/.config/yazi"
+local SAVE_LIST = YAZI_DIR .. "/sshfs.list" -- list of remembered aliases
 local MOUNT_DIR = HOME .. "/mnt" -- mountpoints live here
-local SAVE = PLUGIN_DIR .. "/sshfs.list" -- list of remembered aliases
 
 --=========== Host Cache ======================================================
 local host_cache = {
@@ -408,7 +408,7 @@ end
 ---@return boolean
 local function is_host_cache_valid()
 	local ssh_config_mtime = get_file_mtime(SSH_CONFIG)
-	local save_file_mtime = get_file_mtime(SAVE)
+	local save_file_mtime = get_file_mtime(SAVE_LIST)
 
 	return (
 		host_cache.hosts ~= nil
@@ -420,7 +420,7 @@ end
 ---Update host cache with current file modification times
 local function update_host_cache(hosts)
 	local ssh_config_mtime = get_file_mtime(SSH_CONFIG)
-	local save_file_mtime = get_file_mtime(SAVE)
+	local save_file_mtime = get_file_mtime(SAVE_LIST)
 
 	host_cache.hosts = hosts
 	host_cache.ssh_config_mtime = ssh_config_mtime
@@ -434,7 +434,7 @@ local function get_all_hosts()
 		return host_cache.hosts
 	end
 
-	local hosts = unique(list_extend(read_lines(SAVE), read_ssh_config_hosts()))
+	local hosts = unique(list_extend(read_lines(SAVE_LIST), read_ssh_config_hosts()))
 	update_host_cache(hosts)
 	return hosts
 end
@@ -672,7 +672,7 @@ local function cmd_add_alias()
 		Notify.error("Host must be a valid SSH host string")
 		return
 	end
-	append_line(SAVE, alias)
+	append_line(SAVE_LIST, alias)
 	debug("Saved host alias `%s`", alias)
 
 	-- Update cache
@@ -689,13 +689,13 @@ local function cmd_add_alias()
 			table.insert(host_cache.hosts, alias)
 		end
 		-- Update the save file mtime
-		host_cache.save_file_mtime = get_file_mtime(SAVE)
+		host_cache.save_file_mtime = get_file_mtime(SAVE_LIST)
 	end
 end
 
 local function cmd_remove_alias()
 	-- Choose from saved aliases
-	local saved_aliases = read_lines(SAVE)
+	local saved_aliases = read_lines(SAVE_LIST)
 	local alias = choose("Remove which?", saved_aliases)
 	if not alias then
 		return
@@ -707,8 +707,8 @@ local function cmd_remove_alias()
 			table.insert(updated, line)
 		end
 	end
-	-- Overwrite the SAVE file with updated lines
-	local file, err = io.open(SAVE, "w")
+	-- Overwrite the SAVE_LIST file with updated lines
+	local file, err = io.open(SAVE_LIST, "w")
 	if not file then
 		Notify.error("Failed to open save file: %s", tostring(err))
 		return
@@ -729,7 +729,7 @@ local function cmd_remove_alias()
 		end
 		host_cache.hosts = new_hosts
 		-- Update the save file mtime
-		host_cache.save_file_mtime = get_file_mtime(SAVE)
+		host_cache.save_file_mtime = get_file_mtime(SAVE_LIST)
 	end
 
 	Notify.info(("Alias “%s” removed from saved list"):format(alias))
@@ -823,7 +823,7 @@ local function check_has_mount_dir()
 end
 
 local function check_has_sshfs_list()
-	local url = Url(SAVE)
+	local url = Url(SAVE_LIST)
 	local cha, _ = fs.cha(url)
 	if cha then
 		return true

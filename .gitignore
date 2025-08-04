@@ -72,7 +72,11 @@ luac.out
 # AI
 GEMINI.md
 CLAUDE.md
-CLAUDE/
+QWEN.md
+*.ai.md
+.claude
+.gemini
+.qwen
 *.prompt.md
 *.completion.txt
 chat_logs/
