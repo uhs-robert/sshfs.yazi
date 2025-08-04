@@ -34,8 +34,7 @@ M a  → Add a new custom SSH host
 M r  → Remove a custom SSH host
 ```
 
-https://github.com/user-attachments/assets/b7ef109a-0941-4879-b15a-a343262f0967
-
+<https://github.com/user-attachments/assets/b7ef109a-0941-4879-b15a-a343262f0967>
 
 ## Why SSHFS?
 
@@ -49,7 +48,9 @@ Perfect for tweaking configs, deploying sites, inspecting logs, or just grabbing
 
 ## What it does under the hood
 
-This plugin serves as a wrapper for the `sshfs` command, integrating it seamlessly with Yazi. It automatically reads hosts from your `~/.ssh/config` file. Additionally, it maintains a separate list of custom hosts in `~/.config/yazi/sshfs.list`. The core `sshfs` command used is:
+This plugin serves as a wrapper for the `sshfs` command, integrating it seamlessly with Yazi. It automatically reads hosts from your `~/.ssh/config` file. Additionally, it maintains a separate list of custom hosts in `~/.config/yazi/sshfs.list`.
+
+The core default `sshfs` command used is as follows (you may tweak these options with your setup settings):
 
 ```sh
 sshfs user@host: ~/mnt/alias -o reconnect,compression=yes,ServerAliveInterval=15,ServerAliveCountMax=3
@@ -113,20 +114,28 @@ prepend_keymap = [
 
 ## Configuration
 
-To configure the plugin, you can pass a table to the `setup()` function in your `init.lua`. The following options are available:
+To configure the plugin, you can pass a table to the `setup()` function in your `init.lua`.
+
+To run with default settings, use this:
+
+```lua
+require("sshfs"):setup()
+```
+
+Otherwise you may configure your settings as follows (default settings displayed):
 
 ```lua
 require("sshfs"):setup({
+  -- Mount directory
+  mount_dir = "~/mnt"
+
   -- Enable or disable compression.
-  -- Default: true
   compression = true,
 
   -- Interval to send keep-alive messages to the server.
-  -- Default: 15
   server_alive_interval = 15,
 
   -- Number of keep-alive messages to send before disconnecting.
-  -- Default: 3
   server_alive_count_max = 3,
 
   -- Enable or disable directory caching.
@@ -135,12 +144,10 @@ require("sshfs"):setup({
 
   -- Directory cache timeout in seconds.
   -- Only applies if dir_cache is enabled.
-  -- Default: 300
   dcache_timeout = 300,
 
   -- Maximum size of the directory cache.
   -- Only applies if dir_cache is enabled.
-  -- Default: 10000
   dcache_max_size = 10000,
 })
 ```
@@ -148,7 +155,7 @@ require("sshfs"):setup({
 ## Usage
 
 - **Mount (`M m`):** Choose a host and select a remote directory (`~` or `/`). This works for hosts from your`~/.ssh/config` and any custom hosts you've added.
-- **Add host (`M a`):** Enter a custom host (`user@host`) for Yazi-only use (useful for quick testing or temp setups). For persistent, system-wide access, updating your  `.ssh/config` is recommended.
+- **Add host (`M a`):** Enter a custom host (`user@host`) for Yazi-only use (useful for quick testing or temp setups). For persistent, system-wide access, updating your `.ssh/config` is recommended.
 - **Remove host (`M r`):** Select and remove any Yazi-only hosts that you've added.
 - **Jump to mount (`g m`):** Jump to any active mount from another tab or location.
 - **Unmount (`M u`):** Choose an active mount to unmount it.
@@ -157,8 +164,3 @@ require("sshfs"):setup({
 
 - If key authentication fails, the plugin will prompt for a password up to 3 times before giving up.
 - SSH keys vastly speed up repeated mounts (no password prompt), leverage your `ssh_config` rather than manually adding hosts to make this as easy as possible.
-- You can edit the mount flags in `main.lua` to enable caching:
-
-  ```lua
-  sshfs ... -o cache=yes,cache_timeout=300,compression=no ...
-  ```

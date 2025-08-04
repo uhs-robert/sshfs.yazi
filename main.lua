@@ -95,12 +95,13 @@ local HOME = os.getenv("HOME")
 local SSH_CONFIG = HOME .. "/.ssh/config"
 local YAZI_DIR = HOME .. "/.config/yazi"
 local SAVE_LIST = YAZI_DIR .. "/sshfs.list" -- list of remembered aliases
-local MOUNT_DIR = HOME .. "/mnt" -- mountpoints live here
+-- local MOUNT_DIR = HOME .. "/mnt" -- mountpoints live here
 
 --=========== Plugin State ===========================================================
 ---@enum
 local STATE_KEY = {
 	SSH_OPTIONS = "SSH_OPTIONS",
+	MOUNT_DIR = "MOUNT_DIR",
 }
 
 --=========== Host Cache ======================================================
@@ -475,8 +476,9 @@ end
 ---Check if a mount point is actively mounted
 ---@param path string
 ---@param url Url
+---@param mount_dir string
 ---@return boolean
-local function is_mount_active(path, url)
+local function is_mount_active(path, url, mount_dir)
 	if not is_dir(url) then
 		return false
 	end
@@ -487,7 +489,7 @@ local function is_mount_active(path, url)
 		return not is_dir_empty(url)
 	end
 
-	local mounts = parse_sshfs_mounts(output.stdout, MOUNT_DIR)
+	local mounts = parse_sshfs_mounts(output.stdout, mount_dir)
 	for _, mounted_path in ipairs(mounts) do
 		if mounted_path == path then
 			return true
@@ -498,30 +500,31 @@ local function is_mount_active(path, url)
 end
 
 ---Lists all active mount points
+---@param mount_dir string
 ---@return { alias: string, path: string }[]
-local function list_mounts()
+local function list_mounts(mount_dir)
 	local mounts = {}
 
 	local mountErr, output = run_command("mount", nil, nil, true) --silent
 	if mountErr or not output then
 		debug("Failed to get mount info in list_mounts(), falling back to directory scan")
-		local files, err = fs.read_dir(Url(MOUNT_DIR), { resolve = false })
+		local files, err = fs.read_dir(Url(mount_dir), { resolve = false })
 		if not files then
-			debug("No files in MOUNT_DIR dir: %s", tostring(err))
+			debug("No files in mount_dir dir: %s", tostring(err))
 			return mounts
 		end
 
 		for i, file in ipairs(files) do
 			local url = file.url
 			local path = tostring(url)
-			if is_dir(url) and is_mount_active(path, url) then
+			if is_dir(url) and is_mount_active(path, url, mount_dir) then
 				local alias = file.name
 				debug("Active mount #%d: %s", i, url)
 				mounts[#mounts + 1] = { alias = alias, path = path }
 			end
 		end
 	else
-		for _, path in ipairs(parse_sshfs_mounts(output.stdout, MOUNT_DIR)) do
+		for _, path in ipairs(parse_sshfs_mounts(output.stdout, mount_dir)) do
 			local alias = path:match("([^/]+)$")
 			if alias then
 				debug("Active mount: %s", path)
@@ -661,14 +664,14 @@ end
 ---@param alias string
 ---@param jump boolean
 local function add_mountpoint(alias, jump)
-	debug("Adding mountpoint: `%s`", alias)
-	ensure_dir(Url(MOUNT_DIR))
-	local mountPoint = ("%s/%s"):format(MOUNT_DIR, alias)
+	local mount_dir = get_state(STATE_KEY.MOUNT_DIR)
+	ensure_dir(Url(mount_dir))
+	local mountPoint = ("%s/%s"):format(mount_dir, alias)
 	local mountUrl = Url(mountPoint)
 	ensure_dir(mountUrl)
 
 	-- If already exists, jump to it
-	if is_mount_active(mountPoint, mountUrl) then
+	if is_mount_active(mountPoint, mountUrl, mount_dir) then
 		return finalize_mount(alias, mountPoint, jump)
 	end
 
@@ -785,7 +788,8 @@ end
 
 local function cmd_jump()
 	-- Get active mounts
-	local mounts = list_mounts()
+	local mount_dir = get_state(STATE_KEY.MOUNT_DIR)
+	local mounts = list_mounts(mount_dir)
 	if #mounts == 0 then
 		return Notify.warn("No active mounts to jump to")
 	end
@@ -807,8 +811,9 @@ local function cmd_jump()
 end
 
 local function cmd_unmount()
-	-- get mounted dirs
-	local mounts = list_mounts()
+	-- Get active mounts
+	local mount_dir = get_state(STATE_KEY.MOUNT_DIR)
+	local mounts = list_mounts(mount_dir)
 	if #mounts == 0 then
 		Notify.warn("No SSHFS mounts are active")
 		return
@@ -857,8 +862,9 @@ local function check_dependencies()
 end
 
 ---Verify mount dir exists
-local function check_has_mount_dir()
-	return ensure_dir(Url(MOUNT_DIR))
+local function check_has_MOUNT_DIR()
+	local mount_dir = get_state(STATE_KEY.MOUNT_DIR)
+	return ensure_dir(Url(mount_dir))
 end
 
 ---Verify sshfs.list exists
@@ -883,7 +889,7 @@ local function init()
 			Notify.error("Missing sshfs dependency, please install sshfs and try again...")
 			return false
 		end
-		if not check_has_mount_dir() then
+		if not check_has_MOUNT_DIR() then
 			Notify.error("Could not create mount directory")
 			return false
 		end
@@ -900,6 +906,7 @@ end
 --=========== Plugin start =================================================
 -- Default configuration
 local default_config = {
+	mount_dir = HOME .. "/mnt",
 	compression = true,
 	server_alive_interval = 15,
 	server_alive_count_max = 3,
@@ -908,9 +915,9 @@ local default_config = {
 	dcache_max_size = 10000,
 }
 
----Merges user‑provided config into the defaults.
+---Merges user‑provided ssh configuration options into the defaults.
 ---@param user_config table|nil
-local function set_user_config(user_config)
+local function set_ssh_config(user_config)
 	local ssh_options = {}
 	for k, v in pairs(default_config) do
 		ssh_options[k] = v
@@ -921,11 +928,12 @@ local function set_user_config(user_config)
 		end
 	end
 	set_state(STATE_KEY.SSH_OPTIONS, ssh_options)
+	set_state(STATE_KEY.MOUNT_DIR, ssh_options.mount_dir)
 end
 
 ---Setup
 function M:setup(cfg)
-	set_user_config(cfg)
+	set_ssh_config(cfg)
 end
 
 ---Entry
