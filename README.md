@@ -139,7 +139,6 @@ require("sshfs"):setup({
   server_alive_count_max = 3,
 
   -- Enable or disable directory caching.
-  -- Default: false
   dir_cache = false,
 
   -- Directory cache timeout in seconds.
