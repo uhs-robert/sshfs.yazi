@@ -129,6 +129,9 @@ require("sshfs"):setup({
   -- Mount directory
   mount_dir = "~/mnt"
 
+  -- Set connection timeout when connecting to server (in seconds).
+  connect_timeout = 5,
+
   -- Enable or disable compression.
   compression = true,
 

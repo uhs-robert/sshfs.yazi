@@ -570,6 +570,7 @@ local function getConfigForSSHFS(type)
 	-- General options
 	local options = {
 		"reconnect",
+		string.format("ConnectTimeout=%d", ssh_options.connect_timeout),
 		string.format("compression=%s", ssh_options.compression and "yes" or "no"),
 		string.format("ServerAliveInterval=%d", ssh_options.server_alive_interval),
 		string.format("ServerAliveCountMax=%d", ssh_options.server_alive_count_max),
@@ -907,6 +908,7 @@ end
 -- Default configuration
 local default_config = {
 	mount_dir = HOME .. "/mnt",
+	connect_timeout = 5,
 	compression = true,
 	server_alive_interval = 15,
 	server_alive_count_max = 3,
