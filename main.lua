@@ -2,7 +2,7 @@
 -- SSHFS integration for Yazi
 
 --=========== Plugin Settings =================================================
-local isDebugEnabled = false
+local isDebugEnabled = true
 local M = {}
 local PLUGIN_NAME = "sshfs"
 local USER_ID = ya.uid()
@@ -13,13 +13,13 @@ local HOME = os.getenv("HOME")
 local SSH_CONFIG = HOME .. "/.ssh/config"
 local YAZI_DIR = HOME .. "/.config/yazi"
 local SAVE_LIST = YAZI_DIR .. "/sshfs.list" -- list of remembered aliases
--- local MOUNT_DIR = HOME .. "/mnt" -- mountpoints live here
 
 --=========== Plugin State ===========================================================
 ---@enum
 local STATE_KEY = {
 	SSH_OPTIONS = "SSH_OPTIONS",
 	MOUNT_DIR = "MOUNT_DIR",
+	HAS_FZF = "HAS_FZF",
 }
 
 --=========== Host Cache ======================================================
@@ -237,30 +237,33 @@ local function unique(list)
 	return out
 end
 
----Present a simple which‑key style selector and return the chosen item (Max: 64 choices).
----@param title string
----@param items string[]
----@return string|nil
-local function choose(title, items)
-	--TODO: Add support for above 64 choices.
-	if #items == 0 then
-		return nil
-	elseif #items == 1 then
-		return items[1]
+--- Deep merge two tables: overrides take precedence
+---@param defaults table
+---@param overrides table|nil
+---@return table
+local function deep_merge(defaults, overrides)
+	if type(overrides) ~= "table" then
+		return defaults
 	end
 
-	local keys = "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	local candidates = {}
+	local result = {}
 
-	for i, item in ipairs(items) do
-		if i > #keys then
-			break
+	for k, v in pairs(defaults) do
+		if type(v) == "table" and type(overrides[k]) == "table" then
+			result[k] = deep_merge(v, overrides[k])
+		else
+			result[k] = overrides[k] ~= nil and overrides[k] or v
 		end
-		candidates[#candidates + 1] = { on = keys:sub(i, i), desc = item }
 	end
 
-	local idx = ya.which({ title = title, cands = candidates })
-	return idx and items[idx]
+	-- Include any keys in overrides not in defaults
+	for k, v in pairs(overrides) do
+		if result[k] == nil then
+			result[k] = v
+		end
+	end
+
+	return result
 end
 
 ---Show an input box.
@@ -284,6 +287,156 @@ local function prompt(title, is_password, value)
 	return input_value
 end
 
+---Present a simple which‑key style selector and return the chosen item (Max: 36 options).
+---@param title string
+---@param items string[]
+---@return string|nil
+local function choose_which(title, items)
+	local keys = "1234567890abcdefghijklmnopqrstuvwxyz"
+	local candidates = {}
+	for i, item in ipairs(items) do
+		if i > #keys then
+			break
+		end
+		candidates[#candidates + 1] = { on = keys:sub(i, i), desc = item }
+	end
+
+	local idx = ya.which({ title = title, cands = candidates })
+	return idx and items[idx]
+end
+
+---@param title string
+---@param items string[]
+---@return string|nil
+local function choose_with_fzf(title, items)
+	local permit = ya.hide()
+	local result = nil
+
+	local items_str = table.concat(items, "\n")
+	local args = {
+		"--prompt",
+		title .. "> ",
+		"--height",
+		"100%",
+		"--layout",
+		"reverse",
+		"--border",
+	}
+
+	local cmd = Command("fzf")
+	for _, arg in ipairs(args) do
+		cmd:arg(arg)
+	end
+
+	local child, err = cmd:stdin(Command.PIPED):stdout(Command.PIPED):stderr(Command.PIPED):spawn()
+	if not child then
+		Notify.error("Failed to start `fzf`: %s", tostring(err))
+		permit:drop()
+		return nil
+	end
+
+	child:write_all(items_str)
+	child:flush()
+
+	local output, wait_err = child:wait_with_output()
+	if not output then
+		Notify.error("Cannot read `fzf` output: %s", tostring(wait_err))
+	else
+		if output.status.success and output.status.code ~= 130 and output.stdout ~= "" then
+			result = output.stdout:match("^(.-)\n?$")
+		elseif output.status.code ~= 130 then
+			Notify.error("`fzf` exited with error code %s. Stderr: %s", output.status.code, output.stderr)
+		end
+	end
+
+	permit:drop()
+	return result
+end
+
+local choose
+
+---Shows a filterable list for the user to choose from.
+---@param title string
+---@param items string[]
+---@return string|nil
+local function choose_filtered(title, items)
+	local query = prompt(title .. " (filter)")
+	if query == nil then
+		return nil
+	end
+
+	local filtered_items = {}
+	if query == "" then
+		filtered_items = items
+	else
+		query = query:lower()
+		for _, item in ipairs(items) do
+			if item:lower():find(query, 1, true) then
+				table.insert(filtered_items, item)
+			end
+		end
+	end
+
+	if #filtered_items == 0 then
+		Notify.warn("No items match your filter.")
+		return nil
+	end
+
+	-- After filtering, restart the choose decision matrix
+	return choose(title, filtered_items)
+end
+
+---@param count integer
+---@param max integer
+---@param preferred "auto"|"fzf"|"menu"
+---@return "fzf"|"menu"|"filter"
+local function get_picker(count, max, preferred)
+	local has_fzf = get_state(STATE_KEY.HAS_FZF)
+	if preferred == "auto" then
+		if count > max then
+			return has_fzf and "fzf" or "filter"
+		else
+			return "menu"
+		end
+	elseif preferred == "fzf" then
+		return has_fzf and "fzf" or "filter"
+	elseif preferred == "menu" then
+		return "menu"
+	else
+		return "filter"
+	end
+end
+
+---Present a prompt to choose from a picker
+---@param title string
+---@param items string[]
+---@return string|nil
+choose = function(title, items)
+	local ssh_options = get_state(STATE_KEY.SSH_OPTIONS)
+	local picker = ssh_options.ui.picker or "auto"
+	local max = ssh_options.ui.menu_max or 15
+
+	debug("Picker: %s, max: %d", picker, max)
+
+	if #items == 0 then
+		return nil
+	elseif #items == 1 then
+		return items[1]
+	end
+
+	local mode = get_picker(#items, max, picker)
+
+	debug("Mode: %s", mode)
+
+	if mode == "fzf" then
+		return choose_with_fzf(title, items)
+	elseif mode == "menu" then
+		return choose_which(title, items)
+	elseif mode == "filter" then
+		return choose_filtered(title, items)
+	end
+end
+
 --============== File helpers ====================================
 ---Check if a path exists and is a directory
 ---@param url Url
@@ -298,7 +451,7 @@ end
 ---@return boolean
 local function is_dir_empty(url)
 	local files, _ = fs.read_dir(url, { limit = 1 })
-	return files and #files == 0
+	return type(files) == "table" and #files == 0
 end
 
 --- Make directory path if the directory does not yet exist.
@@ -780,13 +933,26 @@ local function cmd_unmount()
 end
 
 --=========== init requirements ================================================
+
+--Check if fzf is available in the system
+---@return boolean
+local function is_fzf_available()
+	local err, _ = run_command("command", { "-v", "fzf" }, nil, true)
+	return not err
+end
+
 ---Verify all dependencies
 local function check_dependencies()
-	local err, _ = run_command("command", { "-v", "sshfs" })
-	if err then
+	-- Check for sshfs
+	local sshfs_err, _ = run_command("command", { "-v", "sshfs" })
+	if sshfs_err then
 		Notify.error("sshfs is not installed or not in PATH")
 		return false
 	end
+
+	-- Check for fzf (optional dependency)
+	local fzf_err, _ = run_command("command", { "-v", "fzf" }, nil, true)
+	set_state(STATE_KEY.HAS_FZF, not fzf_err)
 	return true
 end
 
@@ -843,27 +1009,23 @@ local default_config = {
 	dir_cache = false,
 	dcache_timeout = 300,
 	dcache_max_size = 10000,
+	ui = {
+		menu_max = 15, -- can go up to 36
+		picker = "auto",
+	},
 }
 
----Merges user‑provided ssh configuration options into the defaults.
+---Merges user‑provided SSH configuration options into the defaults.
 ---@param user_config table|nil
-local function set_ssh_config(user_config)
-	local ssh_options = {}
-	for k, v in pairs(default_config) do
-		ssh_options[k] = v
-	end
-	for k, v in pairs(user_config or {}) do
-		if ssh_options[k] ~= nil and type(ssh_options[k]) == type(v) then
-			ssh_options[k] = v
-		end
-	end
+local function set_plugin_config(user_config)
+	local ssh_options = deep_merge(default_config, user_config or {})
 	set_state(STATE_KEY.SSH_OPTIONS, ssh_options)
 	set_state(STATE_KEY.MOUNT_DIR, ssh_options.mount_dir)
 end
 
 ---Setup
 function M:setup(cfg)
-	set_ssh_config(cfg)
+	set_plugin_config(cfg)
 end
 
 ---Entry
