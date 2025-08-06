@@ -2,7 +2,7 @@
 -- SSHFS integration for Yazi
 
 --=========== Plugin Settings =================================================
-local isDebugEnabled = true
+local isDebugEnabled = false
 local M = {}
 local PLUGIN_NAME = "sshfs"
 local USER_ID = ya.uid()
@@ -388,22 +388,18 @@ end
 
 ---@param count integer
 ---@param max integer
----@param preferred "auto"|"fzf"|"menu"
+---@param preferred "auto"|"fzf"
 ---@return "fzf"|"menu"|"filter"
 local function get_picker(count, max, preferred)
 	local has_fzf = get_state(STATE_KEY.HAS_FZF)
-	if preferred == "auto" then
+	if preferred == "fzf" then
+		return has_fzf and "fzf" or "filter"
+	else
 		if count > max then
 			return has_fzf and "fzf" or "filter"
 		else
 			return "menu"
 		end
-	elseif preferred == "fzf" then
-		return has_fzf and "fzf" or "filter"
-	elseif preferred == "menu" then
-		return "menu"
-	else
-		return "filter"
 	end
 end
 

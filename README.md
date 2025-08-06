@@ -76,7 +76,7 @@ To customize plugin behavior, you may pass a config table to `setup()` (default 
 ```lua
 require("sshfs"):setup({
   -- Mount directory
-  mount_dir = "~/mnt"
+  mount_dir = "~/mnt",
 
   -- Set connection timeout when connecting to server (in seconds).
   connect_timeout = 5,
@@ -100,6 +100,18 @@ require("sshfs"):setup({
   -- Maximum size of the directory cache.
   -- Only applies if dir_cache is enabled.
   dcache_max_size = 10000,
+
+  -- Picker UI settings
+  ui = {
+    -- Maximum number of items to show in the menu picker.
+    -- If the list exceeds this number, a different picker (like fzf) is used.
+    menu_max = 15, -- Recommended: 10–20. Max: 36.
+
+    -- Picker strategy:
+    -- "auto": uses menu if items <= menu_max, otherwise fzf (if available) or a filterable list
+    -- "fzf": always use fzf if available, otherwise fallback to a filterable list
+    picker = "auto", -- "auto" | "fzf"
+  },
 })
 ```
 
