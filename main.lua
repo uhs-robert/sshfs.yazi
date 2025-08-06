@@ -319,18 +319,28 @@ local function unique(list)
 	return out
 end
 
----Present a simple which‑key style selector and return the chosen item.
+---Present a simple which‑key style selector and return the chosen item (Max: 64 choices).
 ---@param title string
 ---@param items string[]
 ---@return string|nil
 local function choose(title, items)
+	--TODO: Add support for above 64 choices.
 	if #items == 0 then
 		return nil
+	elseif #items == 1 then
+		return items[1]
 	end
+
+	local keys = "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	local candidates = {}
-	for index, item in ipairs(items) do
-		candidates[#candidates + 1] = { on = tostring(index), desc = item }
+
+	for i, item in ipairs(items) do
+		if i > #keys then
+			break
+		end
+		candidates[#candidates + 1] = { on = keys:sub(i, i), desc = item }
 	end
+
 	local idx = ya.which({ title = title, cands = candidates })
 	return idx and items[idx]
 end
