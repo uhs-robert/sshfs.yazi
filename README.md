@@ -4,20 +4,7 @@ A minimal, fast **SSHFS** integration for the [Yazi](https://github.com/sxyazi/y
 
 Mount any host from your `~/.ssh/config`, or add custom hosts, and browse remote files as if they were local. Jump between your local machine and remote mounts with a single keystroke.
 
-<!--toc:start-->
-
-- [sshfs.yazi](@sshfs.yazi)
-  - [Preview](#preview)
-  - [Why SSHFS](#why-sshfs)
-  - [What it does under the hood](#what-it-does-under-the-hood)
-  - [Features](#features)
-  - [Requirements](#requirements)
-  - [Installation](#installation)
-  - [Configuration](#configuration)
-  - [Key Mapping](#key-mapping)
-  - [Usage](#usage)
-  - [Tips and Performance](#tips-and-performance)
-  <!--toc:end-->
+<https://github.com/user-attachments/assets/b7ef109a-0941-4879-b15a-a343262f0967>
 
 > [!NOTE]
 >
@@ -30,18 +17,6 @@ Mount any host from your `~/.ssh/config`, or add custom hosts, and browse remote
 > - [Add Windows support](https://github.com/uhs-robert/sshfs.yazi/issues/4)
 >
 > If you have some Lua experience (or want to learn), I’d be happy to walk you through integration and testing. Pull requests are welcome!
-
-## 🖥️ Preview
-
-```text
-M m  → Mount a host from your ~/.ssh/config and jump into it
-M u  → Unmount an active connection
-g m  → Jump to any active mount
-M a  → Add a new custom SSH host
-M r  → Remove a custom SSH host
-```
-
-<https://github.com/user-attachments/assets/b7ef109a-0941-4879-b15a-a343262f0967>
 
 ## 🤔 Why SSHFS?
 
