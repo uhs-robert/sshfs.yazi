@@ -938,14 +938,15 @@ end
 ---Verify all dependencies
 local function check_dependencies()
 	-- Check for sshfs
-	local sshfs_err, _ = run_command("command", { "-v", "sshfs" })
+	local sshfs_err, _ = run_command("sshfs", { "--version" }, nil, true)
 	if sshfs_err then
-		Notify.error("sshfs is not installed or not in PATH")
+		local path = os.getenv("PATH") or "(unset)"
+		Notify.error("sshfs not found. Is it installed and in PATH? PATH=" .. path)
 		return false
 	end
 
 	-- Check for fzf (optional dependency)
-	local fzf_err, _ = run_command("command", { "-v", "fzf" }, nil, true)
+	local fzf_err, _ = run_command("fzf", { "--version" }, nil, true)
 	set_state(STATE_KEY.HAS_FZF, not fzf_err)
 	return true
 end
