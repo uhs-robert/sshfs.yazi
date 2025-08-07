@@ -1,5 +1,10 @@
 # 🧲 sshfs.yazi
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Neovim](https://img.shields.io/badge/NeoVim-0.10+-57A143?logo=neovim)](https://neovim.io/)
+[![GitHub stars](https://img.shields.io/github/stars/uhs-robert/sshfs.yazi?style=social)](https://github.com/uhs-robert/nvim-ssh/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/uhs-robert/sshfs.yazi)](<https://github.com/uhs-robert/sshfs.yazi/issues>)
+
 A minimal, fast **SSHFS** integration for the [Yazi](https://github.com/sxyazi/yazi) terminal file‑manager.
 
 Mount any host from your `~/.ssh/config`, or add custom hosts, and browse remote files as if they were local. Jump between your local machine and remote mounts with a single keystroke.
