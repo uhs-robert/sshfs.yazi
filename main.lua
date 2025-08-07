@@ -928,14 +928,12 @@ local function cmd_unmount()
 	end
 end
 
---=========== init requirements ================================================
-
---Check if fzf is available in the system
----@return boolean
-local function is_fzf_available()
-	local err, _ = run_command("command", { "-v", "fzf" }, nil, true)
-	return not err
+local function cmd_open_mount_dir()
+	local mount_dir = get_state(STATE_KEY.MOUNT_DIR)
+	ya.emit("cd", { mount_dir, raw = true })
 end
+
+--=========== init requirements ================================================
 
 ---Verify all dependencies
 local function check_dependencies()
@@ -1041,6 +1039,8 @@ function M:entry(job)
 		cmd_jump()
 	elseif action == "unmount" then
 		cmd_unmount()
+	elseif action == "home" then
+		cmd_open_mount_dir()
 	else
 		Notify.error("Unknown action")
 	end

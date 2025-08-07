@@ -126,10 +126,11 @@ Add the following to your `~/.config/yazi/keymap.toml`. You can customize keybin
 ```toml
 [mgr]
 prepend_keymap = [
-  { on = ["M","a"], run = "plugin sshfs -- add",             desc = "Add SSH host" },
-  { on = ["M","r"], run = "plugin sshfs -- remove",          desc = "Remove SSH host" },
   { on = ["M","m"], run = "plugin sshfs -- mount --jump",    desc = "Mount & jump" },
   { on = ["M","u"], run = "plugin sshfs -- unmount",         desc = "Unmount SSHFS" },
+  { on = ["M","a"], run = "plugin sshfs -- add",             desc = "Add SSH host" },
+  { on = ["M","r"], run = "plugin sshfs -- remove",          desc = "Remove SSH host" },
+  { on = ["M","h"], run = "plugin sshfs -- home",            desc = "Go to mount home" },
   { on = ["M","c"], run = "cd ~/.ssh/",                      desc = "Go to ssh config" },
   { on = ["g","m"], run = "plugin sshfs -- jump",            desc = "Jump to mount" },
 ]
@@ -138,10 +139,11 @@ prepend_keymap = [
 ## 🚀 Usage
 
 - **Mount (`M m`):** Choose a host and select a remote directory (`~` or `/`). This works for hosts from your`~/.ssh/config` and any custom hosts you've added.
+- **Unmount (`M u`):** Choose an active mount to unmount it.
 - **Add host (`M a`):** Enter a custom host (`user@host`) for Yazi-only use (useful for quick testing or temp setups). For persistent, system-wide access, updating your `.ssh/config` is recommended.
 - **Remove host (`M r`):** Select and remove any Yazi-only hosts that you've added.
 - **Jump to mount (`g m`):** Jump to any active mount from another tab or location.
-- **Unmount (`M u`):** Choose an active mount to unmount it.
+- **Jump to mount home directory (`M h`):** Jump to the mount home directory.
 
 ## 💡 Tips and Performance
 
