@@ -84,28 +84,22 @@ require("sshfs"):setup({
   -- Mount directory
   mount_dir = "~/mnt",
 
-  -- Set connection timeout when connecting to server (in seconds).
-  connect_timeout = 5,
-
-  -- Enable or disable compression.
-  compression = true,
-
-  -- Interval to send keep-alive messages to the server.
-  server_alive_interval = 15,
-
-  -- Number of keep-alive messages to send before disconnecting.
-  server_alive_count_max = 3,
-
-  -- Enable or disable directory caching.
-  dir_cache = false,
-
-  -- Directory cache timeout in seconds.
-  -- Only applies if dir_cache is enabled.
-  dcache_timeout = 300,
-
-  -- Maximum size of the directory cache.
-  -- Only applies if dir_cache is enabled.
-  dcache_max_size = 10000,
+  -- SSHFS mount options (array of strings)
+  -- These options are passed directly to the sshfs command
+  sshfs_options = {
+    "reconnect",                      -- Auto-reconnect on connection loss
+    "ConnectTimeout=5",               -- Connection timeout in seconds
+    "compression=yes",                -- Enable compression
+    "ServerAliveInterval=15",         -- Keep-alive interval
+    "ServerAliveCountMax=3",          -- Keep-alive message count
+    -- "dir_cache=yes",               -- Enable directory caching
+    -- "dcache_timeout=300",          -- Cache timeout in seconds
+    -- "dcache_max_size=10000",       -- Max cache size
+    -- "allow_other",                 -- Allow other users to access mount
+    -- "uid=1000,gid=1000",          -- Set file ownership
+    -- "umask=022",                   -- Set file permissions
+    -- "follow_symlinks",             -- Follow symbolic links
+  },
 
   -- Picker UI settings
   ui = {
@@ -121,9 +115,47 @@ require("sshfs"):setup({
 })
 ```
 
-These configuration options apply to the `sshfs` command. You can learn more about [sshfs mount options here](https://man7.org/linux/man-pages/man1/sshfs.1.html).
+All sshfs options are specified in the `sshfs_options` array. You can learn more about [sshfs mount options here](https://man7.org/linux/man-pages/man1/sshfs.1.html).
 
 In addition, sshfs also supports a variety of options from [sftp](https://man7.org/linux/man-pages/man1/sftp.1.html) and [ssh_config](https://man7.org/linux/man-pages/man5/ssh_config.5.html).
+
+### Advanced Configuration Examples
+
+Here are some common sshfs option combinations:
+
+```lua
+-- Minimal reliable setup
+require("sshfs"):setup({
+  sshfs_options = {
+    "reconnect",
+    "ServerAliveInterval=15",
+    "ServerAliveCountMax=3",
+  },
+})
+
+-- Performance optimized
+require("sshfs"):setup({
+  sshfs_options = {
+    "reconnect",
+    "compression=yes",
+    "cache_timeout=300",
+    "ConnectTimeout=10",
+    "dir_cache=yes",
+    "dcache_timeout=600",
+  },
+})
+
+-- Multi-user access
+require("sshfs"):setup({
+  sshfs_options = {
+    "reconnect",
+    "allow_other",
+    "uid=1000,gid=1000",
+    "umask=022",
+    "ServerAliveInterval=30",
+  },
+})
+```
 
 ## 🎹 Key Mapping
 

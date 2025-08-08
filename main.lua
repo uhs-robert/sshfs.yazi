@@ -17,8 +17,7 @@ local SAVE_LIST = YAZI_DIR .. "/sshfs.list" -- list of remembered aliases
 --=========== Plugin State ===========================================================
 ---@enum
 local STATE_KEY = {
-	SSH_OPTIONS = "SSH_OPTIONS",
-	MOUNT_DIR = "MOUNT_DIR",
+	CONFIG = "CONFIG",
 	HAS_FZF = "HAS_FZF",
 }
 
@@ -358,8 +357,9 @@ local choose
 ---Shows a filterable list for the user to choose from.
 ---@param title string
 ---@param items string[]
+---@param config table|nil Optional config to avoid state retrieval
 ---@return string|nil
-local function choose_filtered(title, items)
+local function choose_filtered(title, items, config)
 	local query = prompt(title .. " (filter)")
 	if query == nil then
 		return nil
@@ -383,7 +383,7 @@ local function choose_filtered(title, items)
 	end
 
 	-- After filtering, restart the choose decision matrix
-	return choose(title, filtered_items)
+	return choose(title, filtered_items, config)
 end
 
 ---@param count integer
@@ -406,11 +406,12 @@ end
 ---Present a prompt to choose from a picker
 ---@param title string
 ---@param items string[]
+---@param config table|nil Optional config to avoid state retrieval
 ---@return string|nil
-choose = function(title, items)
-	local ssh_options = get_state(STATE_KEY.SSH_OPTIONS)
-	local picker = ssh_options.ui.picker or "auto"
-	local max = ssh_options.ui.menu_max or 15
+choose = function(title, items, config)
+	config = config or get_state(STATE_KEY.CONFIG)
+	local picker = config.ui.picker or "auto"
+	local max = config.ui.menu_max or 15
 
 	debug("Picker: %s, max: %d", picker, max)
 
@@ -429,7 +430,7 @@ choose = function(title, items)
 	elseif mode == "menu" then
 		return choose_which(title, items)
 	elseif mode == "filter" then
-		return choose_filtered(title, items)
+		return choose_filtered(title, items, config)
 	end
 end
 
@@ -639,36 +640,27 @@ end
 --======== Mount functions ============================================
 ---Get sshfs user config options
 ---@param type "key"|"password"
-local function getConfigForSSHFS(type)
-	local ssh_options = get_state(STATE_KEY.SSH_OPTIONS)
-	if not ssh_options then
+---@param config table|nil Optional config to avoid state retrieval
+local function getConfigForSSHFS(type, config)
+	config = config or get_state(STATE_KEY.CONFIG)
+	if not config then
 		return {}
 	end
-	-- General options
-	local options = {
-		"reconnect",
-		string.format("ConnectTimeout=%d", ssh_options.connect_timeout),
-		string.format("compression=%s", ssh_options.compression and "yes" or "no"),
-		string.format("ServerAliveInterval=%d", ssh_options.server_alive_interval),
-		string.format("ServerAliveCountMax=%d", ssh_options.server_alive_count_max),
-	}
 
-	-- Handle cache options
-	if ssh_options.dir_cache then
-		for _, opt in ipairs({
-			"dir_cache=yes",
-			string.format("dcache_timeout=%d", ssh_options.dcache_timeout),
-			string.format("dcache_max_size=%d", ssh_options.dcache_max_size),
-		}) do
-			table.insert(options, opt)
-		end
-	end
+	local options = {}
 
-	-- Handle key vs password auth
+	-- Handle key vs password auth (essential for sshfs functionality)
 	if type == "key" then
 		table.insert(options, "BatchMode=yes")
 	else
 		table.insert(options, "password_stdin")
+	end
+
+	-- Use sshfs options
+	if config.sshfs_options and #config.sshfs_options > 0 then
+		for _, sshfs_opt in ipairs(config.sshfs_options) do
+			table.insert(options, sshfs_opt)
+		end
 	end
 
 	return options
@@ -678,9 +670,10 @@ end
 ---@param alias string
 ---@param mountPoint string
 ---@param mount_to_root boolean
-local function try_key_auth(alias, mountPoint, mount_to_root)
+---@param config table|nil Optional config to avoid state retrieval
+local function try_key_auth(alias, mountPoint, mount_to_root, config)
 	mount_to_root = mount_to_root or false
-	local options = getConfigForSSHFS("key")
+	local options = getConfigForSSHFS("key", config)
 	local remote_path = alias .. ":" .. (mount_to_root and "/" or "")
 	local args = {
 		remote_path,
@@ -696,11 +689,12 @@ end
 ---@param mountPoint string
 ---@param mount_to_root boolean
 ---@param max_attempts? integer
+---@param config table|nil Optional config to avoid state retrieval
 ---@return boolean? result, string? reason
-local function try_password_auth(alias, mountPoint, mount_to_root, max_attempts)
+local function try_password_auth(alias, mountPoint, mount_to_root, max_attempts, config)
 	mount_to_root = mount_to_root or false
 	max_attempts = max_attempts or 3
-	local options = getConfigForSSHFS("password")
+	local options = getConfigForSSHFS("password", config)
 	local remote_path = alias .. ":" .. (mount_to_root and "/" or "")
 
 	for attempt = 1, max_attempts do
@@ -742,7 +736,8 @@ end
 ---@param alias string
 ---@param jump boolean
 local function add_mountpoint(alias, jump)
-	local mount_dir = get_state(STATE_KEY.MOUNT_DIR)
+	local config = get_state(STATE_KEY.CONFIG)
+	local mount_dir = config.mount_dir
 	ensure_dir(Url(mount_dir))
 	local mountPoint = ("%s/%s"):format(mount_dir, alias)
 	local mountUrl = Url(mountPoint)
@@ -763,12 +758,12 @@ local function add_mountpoint(alias, jump)
 	}) == 2
 
 	-- Try key authentication then try password if it fails
-	local err, _ = try_key_auth(alias, mountPoint, mount_to_root)
+	local err, _ = try_key_auth(alias, mountPoint, mount_to_root, config)
 	if not err then
 		return finalize_mount(alias, mountPoint, jump)
 	end
 
-	local ok, reason = try_password_auth(alias, mountPoint, mount_to_root)
+	local ok, reason = try_password_auth(alias, mountPoint, mount_to_root, nil, config)
 	if ok then
 		return finalize_mount(alias, mountPoint, jump)
 	elseif ok == false then
@@ -812,9 +807,10 @@ local function cmd_add_alias()
 end
 
 local function cmd_remove_alias()
+	local config = get_state(STATE_KEY.CONFIG)
 	-- Choose from saved aliases
 	local saved_aliases = read_lines(SAVE_LIST)
-	local alias = choose("Remove which?", saved_aliases)
+	local alias = choose("Remove which?", saved_aliases, config)
 	if not alias then
 		return
 	end
@@ -854,11 +850,12 @@ local function cmd_remove_alias()
 end
 
 local function cmd_mount(args)
+	local config = get_state(STATE_KEY.CONFIG)
 	-- Get alias_list
 	local jump = args.jump == true
 	local alias_list = get_all_hosts()
 	-- Choose alias to mount then add it
-	local chosen_alias = (#alias_list == 1) and alias_list[1] or choose("Mount which host?", alias_list)
+	local chosen_alias = (#alias_list == 1) and alias_list[1] or choose("Mount which host?", alias_list, config)
 	if chosen_alias then
 		add_mountpoint(chosen_alias, jump)
 	end
@@ -866,7 +863,8 @@ end
 
 local function cmd_jump()
 	-- Get active mounts
-	local mount_dir = get_state(STATE_KEY.MOUNT_DIR)
+	local config = get_state(STATE_KEY.CONFIG)
+	local mount_dir = config.mount_dir
 	local mounts = list_mounts(mount_dir)
 	if #mounts == 0 then
 		return Notify.warn("No active mounts to jump to")
@@ -876,7 +874,7 @@ local function cmd_jump()
 	for _, m in ipairs(mounts) do
 		labels[#labels + 1] = m.alias
 	end
-	local choice = (#labels == 1) and labels[1] or choose("Jump to mount", labels)
+	local choice = (#labels == 1) and labels[1] or choose("Jump to mount", labels, config)
 	-- Jump to directory
 	if not choice then
 		return
@@ -890,7 +888,8 @@ end
 
 local function cmd_unmount()
 	-- Get active mounts
-	local mount_dir = get_state(STATE_KEY.MOUNT_DIR)
+	local config = get_state(STATE_KEY.CONFIG)
+	local mount_dir = config.mount_dir
 	local mounts = list_mounts(mount_dir)
 	if #mounts == 0 then
 		Notify.warn("No SSHFS mounts are active")
@@ -901,7 +900,7 @@ local function cmd_unmount()
 	for _, m in ipairs(mounts) do
 		aliases[#aliases + 1] = m.alias
 	end
-	local alias = (#aliases == 1) and aliases[1] or choose("Unmount which?", aliases)
+	local alias = (#aliases == 1) and aliases[1] or choose("Unmount which?", aliases, config)
 	if not alias then
 		return
 	end
@@ -929,7 +928,8 @@ local function cmd_unmount()
 end
 
 local function cmd_open_mount_dir()
-	local mount_dir = get_state(STATE_KEY.MOUNT_DIR)
+	local config = get_state(STATE_KEY.CONFIG)
+	local mount_dir = config.mount_dir
 	ya.emit("cd", { mount_dir, raw = true })
 end
 
@@ -952,8 +952,9 @@ local function check_dependencies()
 end
 
 ---Verify mount dir exists
-local function check_has_MOUNT_DIR()
-	local mount_dir = get_state(STATE_KEY.MOUNT_DIR)
+local function check_has_mount_directory()
+	local config = get_state(STATE_KEY.CONFIG)
+	local mount_dir = config.mount_dir
 	return ensure_dir(Url(mount_dir))
 end
 
@@ -979,7 +980,7 @@ local function init()
 			Notify.error("Missing sshfs dependency, please install sshfs and try again...")
 			return false
 		end
-		if not check_has_MOUNT_DIR() then
+		if not check_has_mount_directory() then
 			Notify.error("Could not create mount directory")
 			return false
 		end
@@ -997,25 +998,25 @@ end
 -- Default configuration
 local default_config = {
 	mount_dir = HOME .. "/mnt",
-	connect_timeout = 5,
-	compression = true,
-	server_alive_interval = 15,
-	server_alive_count_max = 3,
-	dir_cache = false,
-	dcache_timeout = 300,
-	dcache_max_size = 10000,
+	-- Default sshfs options
+	sshfs_options = {
+		"reconnect",
+		"ConnectTimeout=5",
+		"compression=yes",
+		"ServerAliveInterval=15",
+		"ServerAliveCountMax=3",
+	},
 	ui = {
 		menu_max = 15, -- can go up to 36
 		picker = "auto",
 	},
 }
 
----Merges user‑provided SSH configuration options into the defaults.
+---Merges user‑provided configuration options into the defaults.
 ---@param user_config table|nil
 local function set_plugin_config(user_config)
-	local ssh_options = deep_merge(default_config, user_config or {})
-	set_state(STATE_KEY.SSH_OPTIONS, ssh_options)
-	set_state(STATE_KEY.MOUNT_DIR, ssh_options.mount_dir)
+	local config = deep_merge(default_config, user_config or {})
+	set_state(STATE_KEY.CONFIG, config)
 end
 
 ---Setup
