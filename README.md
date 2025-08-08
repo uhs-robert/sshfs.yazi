@@ -1,4 +1,4 @@
-# 🧲 sshfs.yazi
+# 📡 sshfs.yazi
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Yazi](https://img.shields.io/badge/Yazi-25.5%2B-blue)](https://github.com/sxyazi/yazi)
