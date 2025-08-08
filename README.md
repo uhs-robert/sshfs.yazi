@@ -1,9 +1,10 @@
 # 🧲 sshfs.yazi
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Neovim](https://img.shields.io/badge/NeoVim-0.10+-57A143?logo=neovim)](https://neovim.io/)
-[![GitHub stars](https://img.shields.io/github/stars/uhs-robert/sshfs.yazi?style=social)](https://github.com/uhs-robert/nvim-ssh/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues/uhs-robert/sshfs.yazi)](<https://github.com/uhs-robert/sshfs.yazi/issues>)
+[![Yazi](https://img.shields.io/badge/Yazi-25.5%2B-blue)](https://github.com/sxyazi/yazi)
+[![GitHub stars](https://img.shields.io/github/stars/uhs-robert/sshfs.yazi?style=social)](https://github.com/uhs-robert/sshfs.yazi/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues-raw/uhs-robert/sshfs.yazi)](https://github.com/uhs-robert/sshfs.yazi/issues)
+
 
 A minimal, fast **SSHFS** integration for the [Yazi](https://github.com/sxyazi/yazi) terminal file‑manager.
 
@@ -54,7 +55,7 @@ sshfs user@host: ~/mnt/alias -o reconnect,compression=yes,ServerAliveInterval=15
 
 | Software   | Minimum       | Notes                               |
 | ---------- | ------------- | ----------------------------------- |
-| Yazi       | `>=25.5.31`   | tested on 25.6+                     |
+| Yazi       | `>=25.5.31`   | untested on 25.6+                   |
 | sshfs      | any           | `sudo dnf/apt/pacman install sshfs` |
 | fusermount | from FUSE     | Usually pre-installed on Linux      |
 | SSH config | working hosts | Hosts come from `~/.ssh/config`     |
