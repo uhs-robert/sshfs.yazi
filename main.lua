@@ -153,7 +153,10 @@ local function run_command(cmd, args, input, is_silent)
 		if not is_silent then
 			debug(msgPrefix .. "stderr: %s", output.stderr)
 		end
-		return output.stderr, output
+		-- Only treat stderr as error if command actually failed
+		if output.status and not output.status.success then
+			return output.stderr, output
+		end
 	end
 
 	return nil, output
@@ -668,29 +671,15 @@ local function getConfigForSSHFS(type, config)
 		end
 	end
 
-	-- Ensure sshfs_debug is present for key authentication (needed for auth method detection)
-	if type == "key" then
-		local has_debug = false
-		for _, opt in ipairs(options) do
-			if opt == "sshfs_debug" then
-				has_debug = true
-				break
-			end
-		end
-		if not has_debug then
-			table.insert(options, "sshfs_debug")
-		end
-	end
-
 	return options
 end
 
----Tries sshfs via key authentication with debug output parsing
+---Tries sshfs via key authentication
 ---@param alias string
 ---@param mountPoint string
 ---@param mount_to_root boolean
 ---@param config table|nil Optional config to avoid state retrieval
----@return string|nil err_msg, Output|nil output, boolean supports_password
+---@return string|nil err_msg, Output|nil output
 local function try_key_auth(alias, mountPoint, mount_to_root, config)
 	mount_to_root = mount_to_root or false
 	local options = getConfigForSSHFS("key", config)
@@ -703,24 +692,12 @@ local function try_key_auth(alias, mountPoint, mount_to_root, config)
 		table.concat(options, ","),
 	}
 
-	debug("Attempting key authentication for %s with options: %s", alias, table.concat(options, ","))
 	local err, output = run_command("sshfs", args, nil, true) --silent
-
-	local supports_password = false
-	if output and output.stderr then
-		debug("Key auth stderr: %s", output.stderr)
-		-- Parse stderr for authentication methods in "Permission denied (method1,method2)" format
-		local auth_methods = output.stderr:match("Permission denied %(([^)]+)%)")
-		if auth_methods then
-			debug("Server supports authentication methods: %s", auth_methods)
-			-- Check if password or keyboard-interactive authentication is supported
-			supports_password = auth_methods:match("password") ~= nil
-				or auth_methods:match("keyboard%-interactive") ~= nil
-		end
+	if output and output.status and output.status.success then
+		return nil, output
 	end
 
-	debug("Key auth result - Error: %s, Supports password: %s", tostring(err), tostring(supports_password))
-	return err, output, supports_password
+	return err, output
 end
 
 ---Tries sshfs via password input, with retries allowed
@@ -767,7 +744,7 @@ end
 ---@param mountPoint string
 ---@param jump boolean
 local function finalize_mount(alias, mountPoint, jump)
-	Notify.info(("Mounted “%s”"):format(alias))
+	Notify.info(("Mounted %s"):format(alias))
 	if jump then
 		ya.emit("cd", { mountPoint, raw = true })
 	end
@@ -798,25 +775,20 @@ local function add_mountpoint(alias, jump)
 		},
 	}) == 2
 
-	-- Try key authentication, then maybe try password based on server capability
-	local err_key_auth, _, supports_password = try_key_auth(alias, mountPoint, mount_to_root, config)
+	-- Try key authentication, then try password authentication as fallback
+	local err_key_auth = try_key_auth(alias, mountPoint, mount_to_root, config)
 	if not err_key_auth then
 		return finalize_mount(alias, mountPoint, jump)
 	end
 
-	-- Key auth failed → check if password authentication is supported by server
-	if supports_password then
-		local ok, pass_err = try_password_auth(alias, mountPoint, mount_to_root, config)
-		if ok then
-			return finalize_mount(alias, mountPoint, jump)
-		elseif ok == false then
-			Notify.error("Password authentication failed: " .. (pass_err or "unknown"))
-		else
-			debug("Aborted: " .. (pass_err or "user cancelled"))
-		end
+	-- Key auth failed → always try password authentication as fallback
+	local ok, pass_err = try_password_auth(alias, mountPoint, mount_to_root, config)
+	if ok then
+		return finalize_mount(alias, mountPoint, jump)
+	elseif ok == false then
+		Notify.error("Authentication failed: " .. (pass_err or "unknown"))
 	else
-		-- Server doesn't support password auth → show the original key error
-		Notify.error(err_key_auth)
+		-- User cancelled password prompt
 	end
 
 	-- error or abort clean up
