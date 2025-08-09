@@ -1,9 +1,9 @@
 # 📡 sshfs.yazi
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Yazi](https://img.shields.io/badge/Yazi-25.5%2B-blue)](https://github.com/sxyazi/yazi)
-[![GitHub stars](https://img.shields.io/github/stars/uhs-robert/sshfs.yazi?style=social)](https://github.com/uhs-robert/sshfs.yazi/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues-raw/uhs-robert/sshfs.yazi)](https://github.com/uhs-robert/sshfs.yazi/issues)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![Yazi](https://img.shields.io/badge/Yazi-25.5%2B-blue?style=for-the-badge)](https://github.com/sxyazi/yazi)
+[![GitHub stars](https://img.shields.io/github/stars/uhs-robert/sshfs.yazi?style=for-the-badge)](https://github.com/uhs-robert/sshfs.yazi/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues-raw/uhs-robert/sshfs.yazi?style=for-the-badge)](https://github.com/uhs-robert/sshfs.yazi/issues)
 
 A minimal, fast **SSHFS** integration for the [Yazi](https://github.com/sxyazi/yazi) terminal file‑manager.
 
