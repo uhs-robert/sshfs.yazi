@@ -29,6 +29,11 @@ local host_cache = {
 }
 
 --================= Notify / Logger ===========================================
+local TIMEOUTS = {
+	error = 8,
+	warn = 8,
+	info = 3,
+}
 local Notify = {}
 ---@param level "info"|"warn"|"error"|nil
 ---@param s string
@@ -39,7 +44,7 @@ function Notify._send(level, s, ...)
 	local entry = {
 		title = PLUGIN_NAME,
 		content = content,
-		timeout = 3,
+		timeout = TIMEOUTS[level] or 3,
 		level = level,
 	}
 	ya.notify(entry)
@@ -76,7 +81,7 @@ end
 ---@param args? string[]
 ---@param input? string  -- optional stdin input (e.g., password)
 ---@param is_silent? boolean
----@return Error|true|nil, Output|nil
+---@return string|nil, Output|nil
 local function run_command(cmd, args, input, is_silent)
 	debug("Executing command: " .. cmd .. (args and #args > 0 and (" " .. table.concat(args, " ")) or ""))
 	local msgPrefix = "Command: " .. cmd .. " - "
@@ -104,7 +109,7 @@ local function run_command(cmd, args, input, is_silent)
 		if not is_silent then
 			Notify.error(msgPrefix .. "Failed to start. Error: %s", tostring(cmd_err))
 		end
-		return cmd_err, nil
+		return cmd_err and tostring(cmd_err), nil
 	end
 
 	-- Send stdin input if available
@@ -114,7 +119,7 @@ local function run_command(cmd, args, input, is_silent)
 			if not is_silent then
 				Notify.error(msgPrefix .. "Failed to write, stdin: %s", tostring(err))
 			end
-			return err, nil
+			return err and tostring(err), nil
 		end
 
 		local flushed, flush_err = child:flush()
@@ -122,7 +127,7 @@ local function run_command(cmd, args, input, is_silent)
 			if not is_silent then
 				Notify.error(msgPrefix .. "Failed to flush, stdin: %s", tostring(flush_err))
 			end
-			return flush_err, nil
+			return flush_err and tostring(flush_err), nil
 		end
 	end
 
@@ -132,7 +137,7 @@ local function run_command(cmd, args, input, is_silent)
 		if not is_silent then
 			Notify.error(msgPrefix .. "Failed to get output, error: %s", tostring(out_err))
 		end
-		return out_err, nil
+		return out_err and tostring(out_err), nil
 	end
 
 	-- Log outputs
@@ -148,7 +153,7 @@ local function run_command(cmd, args, input, is_silent)
 		if not is_silent then
 			debug(msgPrefix .. "stderr: %s", output.stderr)
 		end
-		return true, nil
+		return output.stderr, output
 	end
 
 	return nil, output
@@ -663,17 +668,33 @@ local function getConfigForSSHFS(type, config)
 		end
 	end
 
+	-- Ensure sshfs_debug is present for key authentication (needed for auth method detection)
+	if type == "key" then
+		local has_debug = false
+		for _, opt in ipairs(options) do
+			if opt == "sshfs_debug" then
+				has_debug = true
+				break
+			end
+		end
+		if not has_debug then
+			table.insert(options, "sshfs_debug")
+		end
+	end
+
 	return options
 end
 
----Tries sshfs via key authentication
+---Tries sshfs via key authentication with debug output parsing
 ---@param alias string
 ---@param mountPoint string
 ---@param mount_to_root boolean
 ---@param config table|nil Optional config to avoid state retrieval
+---@return string|nil err_msg, Output|nil output, boolean supports_password
 local function try_key_auth(alias, mountPoint, mount_to_root, config)
 	mount_to_root = mount_to_root or false
 	local options = getConfigForSSHFS("key", config)
+
 	local remote_path = alias .. ":" .. (mount_to_root and "/" or "")
 	local args = {
 		remote_path,
@@ -681,44 +702,64 @@ local function try_key_auth(alias, mountPoint, mount_to_root, config)
 		"-o",
 		table.concat(options, ","),
 	}
-	return run_command("sshfs", args, nil, true) --silent
+
+	debug("Attempting key authentication for %s with options: %s", alias, table.concat(options, ","))
+	local err, output = run_command("sshfs", args, nil, true) --silent
+
+	local supports_password = false
+	if output and output.stderr then
+		debug("Key auth stderr: %s", output.stderr)
+		-- Parse stderr for authentication methods in "Permission denied (method1,method2)" format
+		local auth_methods = output.stderr:match("Permission denied %(([^)]+)%)")
+		if auth_methods then
+			debug("Server supports authentication methods: %s", auth_methods)
+			-- Check if password or keyboard-interactive authentication is supported
+			supports_password = auth_methods:match("password") ~= nil
+				or auth_methods:match("keyboard%-interactive") ~= nil
+		end
+	end
+
+	debug("Key auth result - Error: %s, Supports password: %s", tostring(err), tostring(supports_password))
+	return err, output, supports_password
 end
 
 ---Tries sshfs via password input, with retries allowed
 ---@param alias string
 ---@param mountPoint string
 ---@param mount_to_root boolean
----@param max_attempts? integer
 ---@param config table|nil Optional config to avoid state retrieval
 ---@return boolean? result, string? reason
-local function try_password_auth(alias, mountPoint, mount_to_root, max_attempts, config)
+local function try_password_auth(alias, mountPoint, mount_to_root, config)
 	mount_to_root = mount_to_root or false
-	max_attempts = max_attempts or 3
+	config = config or get_state(STATE_KEY.CONFIG)
+	local max_attempts = (config and config.password_attempts) or 3
 	local options = getConfigForSSHFS("password", config)
 	local remote_path = alias .. ":" .. (mount_to_root and "/" or "")
+	local args = {
+		remote_path,
+		mountPoint,
+		"-o",
+		table.concat(options, ","),
+	}
 
+	debug("Attempting password authentication for %s with options: %s", alias, table.concat(options, ","))
+
+	local last_err
 	for attempt = 1, max_attempts do
 		local pw = prompt(("Password for %s (%d/%d):"):format(alias, attempt, max_attempts), true)
 		if not pw or pw == "" then
 			return nil, "User aborted"
 		end
-
-		local args = {
-			remote_path,
-			mountPoint,
-			"-o",
-			table.concat(options, ","),
-		}
-
 		local err, _ = run_command("sshfs", args, pw .. "\n", true) --silent
-		if err then
-			Notify.error("sshfs: authentication failed")
-		else
-			return true
+		if not err then
+			return true, nil
 		end
+		last_err = err
+		-- Continue to next attempt if we haven't reached max_attempts
 	end
 
-	return false, "Authentication failed"
+	-- All attempts failed
+	return false, last_err
 end
 
 ---Handles exit conditions after mount is done
@@ -757,19 +798,25 @@ local function add_mountpoint(alias, jump)
 		},
 	}) == 2
 
-	-- Try key authentication then try password if it fails
-	local err, _ = try_key_auth(alias, mountPoint, mount_to_root, config)
-	if not err then
+	-- Try key authentication, then maybe try password based on server capability
+	local err_key_auth, _, supports_password = try_key_auth(alias, mountPoint, mount_to_root, config)
+	if not err_key_auth then
 		return finalize_mount(alias, mountPoint, jump)
 	end
 
-	local ok, reason = try_password_auth(alias, mountPoint, mount_to_root, nil, config)
-	if ok then
-		return finalize_mount(alias, mountPoint, jump)
-	elseif ok == false then
-		Notify.error("Failed: " .. (reason or "unknown"))
+	-- Key auth failed → check if password authentication is supported by server
+	if supports_password then
+		local ok, pass_err = try_password_auth(alias, mountPoint, mount_to_root, config)
+		if ok then
+			return finalize_mount(alias, mountPoint, jump)
+		elseif ok == false then
+			Notify.error("Password authentication failed: " .. (pass_err or "unknown"))
+		else
+			debug("Aborted: " .. (pass_err or "user cancelled"))
+		end
 	else
-		debug("Aborted: " .. (reason or "user cancelled"))
+		-- Server doesn't support password auth → show the original key error
+		Notify.error(err_key_auth)
 	end
 
 	-- error or abort clean up
@@ -998,6 +1045,7 @@ end
 -- Default configuration
 local default_config = {
 	mount_dir = HOME .. "/mnt",
+	password_attempts = 3, -- Number of password attempts before giving up
 	-- Default sshfs options
 	sshfs_options = {
 		"reconnect",

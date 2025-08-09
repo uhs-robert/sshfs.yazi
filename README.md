@@ -5,7 +5,6 @@
 [![GitHub stars](https://img.shields.io/github/stars/uhs-robert/sshfs.yazi?style=social)](https://github.com/uhs-robert/sshfs.yazi/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues-raw/uhs-robert/sshfs.yazi)](https://github.com/uhs-robert/sshfs.yazi/issues)
 
-
 A minimal, fast **SSHFS** integration for the [Yazi](https://github.com/sxyazi/yazi) terminal file‑manager.
 
 Mount any host from your `~/.ssh/config`, or add custom hosts, and browse remote files as if they were local. Jump between your local machine and remote mounts with a single keystroke.
@@ -84,20 +83,22 @@ require("sshfs"):setup({
   -- Mount directory
   mount_dir = "~/mnt",
 
+  -- Password authentication attempts before giving up
+  password_attempts = 3,
+
   -- SSHFS mount options (array of strings)
   -- These options are passed directly to the sshfs command
   sshfs_options = {
     "reconnect",                      -- Auto-reconnect on connection loss
     "ConnectTimeout=5",               -- Connection timeout in seconds
     "compression=yes",                -- Enable compression
-    "ServerAliveInterval=15",         -- Keep-alive interval
+    "ServerAliveInterval=15",         -- Keep-alive interval (15s × 3 = 45s timeout)
     "ServerAliveCountMax=3",          -- Keep-alive message count
-    -- "dir_cache=yes",               -- Enable directory caching
+    -- "dir_cache=yes",               -- Enable directory caching (default: yes)
     -- "dcache_timeout=300",          -- Cache timeout in seconds
     -- "dcache_max_size=10000",       -- Max cache size
     -- "allow_other",                 -- Allow other users to access mount
-    -- "uid=1000,gid=1000",          -- Set file ownership
-    -- "umask=022",                   -- Set file permissions
+    -- "uid=1000,gid=1000",           -- Set file ownership
     -- "follow_symlinks",             -- Follow symbolic links
   },
 
