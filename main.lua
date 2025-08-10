@@ -518,6 +518,7 @@ local function is_host_cache_valid()
 end
 
 ---Update host cache with current file modification times
+---@param hosts string[]
 local function update_host_cache(hosts)
 	local ssh_config_mtime = get_file_mtime(SSH_CONFIG)
 	local save_file_mtime = get_file_mtime(SAVE_LIST)
@@ -534,7 +535,22 @@ local function get_all_hosts()
 		return host_cache.hosts
 	end
 
-	local hosts = unique(list_extend(read_lines(SAVE_LIST), read_ssh_config_hosts()))
+	local ssh_config_hosts = read_ssh_config_hosts()
+	local hosts
+
+	-- Check if custom hosts file exists
+	local url = Url(SAVE_LIST)
+	local cha, _ = fs.cha(url)
+
+	if cha then
+		-- Custom hosts file exists - combine SSH config and saved hosts
+		local saved_hosts = read_lines(SAVE_LIST)
+		hosts = unique(list_extend(saved_hosts, ssh_config_hosts))
+	else
+		-- No custom hosts file - only use SSH config
+		hosts = ssh_config_hosts
+	end
+
 	update_host_cache(hosts)
 	return hosts
 end
@@ -826,13 +842,23 @@ local function cmd_add_alias()
 end
 
 local function cmd_remove_alias()
-	local config = get_state(STATE_KEY.CONFIG)
+	-- Check if custom hosts file exists
+	local url = Url(SAVE_LIST)
+	local cha, _ = fs.cha(url)
+
+	if not cha then
+		Notify.warn("No custom hosts to remove")
+		return
+	end
+
 	-- Choose from saved aliases
+	local config = get_state(STATE_KEY.CONFIG)
 	local saved_aliases = read_lines(SAVE_LIST)
 	local alias = choose("Remove which?", saved_aliases, config)
 	if not alias then
 		return
 	end
+
 	-- Filter out the chosen alias
 	local updated = {}
 	for _, line in ipairs(saved_aliases) do
@@ -840,16 +866,23 @@ local function cmd_remove_alias()
 			table.insert(updated, line)
 		end
 	end
-	-- Overwrite the SAVE_LIST file with updated lines
-	local file, err = io.open(SAVE_LIST, "w")
-	if not file then
-		Notify.error("Failed to open save file: %s", tostring(err))
-		return
+
+	-- If no hosts remain, delete the file
+	if #updated == 0 then
+		fs.remove("file", url)
+		debug("Deleted empty custom hosts file")
+	else
+		-- Overwrite the save list file with updated lines
+		local file, err = io.open(SAVE_LIST, "w")
+		if not file then
+			Notify.error("Failed to open save file: %s", tostring(err))
+			return
+		end
+		for _, line in ipairs(updated) do
+			file:write(line, "\n")
+		end
+		file:close()
 	end
-	for _, line in ipairs(updated) do
-		file:write(line, "\n")
-	end
-	file:close()
 
 	-- Update cache
 	if host_cache.hosts then
@@ -977,20 +1010,6 @@ local function check_has_mount_directory()
 	return ensure_dir(Url(mount_dir))
 end
 
----Verify sshfs.list exists
-local function check_has_sshfs_list()
-	local url = Url(SAVE_LIST)
-	local cha, _ = fs.cha(url)
-	if cha then
-		return true
-	end
-	local ok, _ = fs.write(url, "")
-	if ok then
-		return true
-	end
-	return false
-end
-
 ---Initialize the plugin, verify all dependencies
 local function init()
 	local initialized = get_state("is_initialized")
@@ -1001,10 +1020,6 @@ local function init()
 		end
 		if not check_has_mount_directory() then
 			Notify.error("Could not create mount directory")
-			return false
-		end
-		if not check_has_sshfs_list() then
-			Notify.error("Could not create sshfs.list")
 			return false
 		end
 		initialized = true
