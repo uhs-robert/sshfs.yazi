@@ -65,7 +65,7 @@ Install the plugin via Yazi's package manager:
 
 ```sh
 # via Yazi’s package manager
-ya pack -a uhs-robert/sshfs
+ya pkg add uhs-robert/sshfs
 ```
 
 Then add the following to your `~/.config/yazi/init.lua` to enable the plugin with default settings:
