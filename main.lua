@@ -985,6 +985,38 @@ local function cmd_open_mount_dir()
 	ya.emit("cd", { mount_dir, raw = true })
 end
 
+local function cmd_open_ssh_config()
+	ya.emit("cd", { HOME .. "/.ssh/", raw = true })
+end
+
+local function cmd_menu()
+	local choice = ya.which({
+		title = "SSHFS Menu",
+		cands = {
+			{ on = "m", desc = "Mount & jump" },
+			{ on = "u", desc = "Unmount" },
+			{ on = "a", desc = "Add host" },
+			{ on = "r", desc = "Remove host" },
+			{ on = "h", desc = "Go to mount home" },
+			{ on = "c", desc = "Open ~/.ssh/config" },
+		},
+	})
+
+	if choice == 1 then
+		cmd_mount({ jump = true })
+	elseif choice == 2 then
+		cmd_unmount()
+	elseif choice == 3 then
+		cmd_add_alias()
+	elseif choice == 4 then
+		cmd_remove_alias()
+	elseif choice == 5 then
+		cmd_open_mount_dir()
+	elseif choice == 6 then
+		cmd_open_ssh_config()
+	end
+end
+
 --=========== init requirements ================================================
 
 ---Verify all dependencies
@@ -1078,6 +1110,8 @@ function M:entry(job)
 		cmd_unmount()
 	elseif action == "home" then
 		cmd_open_mount_dir()
+	elseif action == "menu" then
+		cmd_menu()
 	else
 		Notify.error("Unknown action")
 	end

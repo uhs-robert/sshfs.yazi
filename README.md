@@ -182,7 +182,30 @@ require("sshfs"):setup({
 
 ## 🎹 Key Mapping
 
-Add the following to your `~/.config/yazi/keymap.toml`. You can customize keybindings to your preference.
+### Recommended: Menu-based approach (avoids conflicts)
+
+Add this to your `~/.config/yazi/keymap.toml` for a conflict-free approach that works well with [mount.yazi](https://github.com/yazi-rs/plugins/tree/main/mount.yazi):
+
+```toml
+[mgr]
+prepend_keymap = [
+  { on = ["M","s"], run = "plugin sshfs -- menu",            desc = "Open SSHFS options" },
+  { on = ["g","m"], run = "plugin sshfs -- jump",            desc = "Jump to SSHFS mount" },
+]
+```
+
+The `M s` menu provides access to all SSHFS functions:
+
+- `m` → Mount & jump
+- `u` → Unmount
+- `a` → Add host
+- `r` → Remove host
+- `h` → Go to mount home
+- `c` → Open ~/.ssh/config
+
+### Alternative: Direct keybinds (legacy support)
+
+If you prefer direct keybinds and don't use `mount.yazi``, you can use these instead:
 
 ```toml
 [mgr]
@@ -198,6 +221,13 @@ prepend_keymap = [
 ```
 
 ## 🚀 Usage
+
+### Menu-based usage (recommended)
+
+- **SSHFS Menu (`M s`):** Opens an interactive menu with all SSHFS options
+- **Jump to mount (`g m`):** Jump to any active mount from another tab or location
+
+### Direct keybind usage (if using legacy keybinds)
 
 - **Mount (`M m`):** Choose a host and select a remote directory (`~` or `/`). This works for hosts from your`~/.ssh/config` and any custom hosts you've added.
 - **Unmount (`M u`):** Choose an active mount to unmount it.
