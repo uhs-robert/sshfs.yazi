@@ -13,19 +13,18 @@ Mount any host from your `~/.ssh/config`, or add custom hosts, and browse remote
 
 > [!NOTE]
 >
-> **Linux Only (for now!)**
+> **Linux/Mac Only (for now!)**
 >
-> This plugin currently supports Linux only.
+> This plugin currently only supports Linux/Mac.
 > If you're interested in helping add support for other platforms, check out the open issues:
 >
-> - [Add macOS support](https://github.com/uhs-robert/sshfs.yazi/issues/3)
 > - [Add Windows support](https://github.com/uhs-robert/sshfs.yazi/issues/4)
 >
 > If you have some Lua experience (or want to learn), I’d be happy to walk you through integration and testing. Pull requests are welcome!
 
 ## 🤔 Why SSHFS?
 
-- **Works anywhere you have SSH access.** No VPN, NFS or Samba needed – only port 22.
+- **Works anywhere you have SSH access.** Nothing extra is needed – only port 22.
 - **Treat remote files like local ones.** Run `vim`, `nvim`, `sed`, preview images / videos directly, etc.
 - **User‑space, unprivileged.** No root required; mounts live under your chosen mount directory or the default (`~/mnt`).
 - **Bandwidth‑friendly.** SSH compression, connection timeout, and reconnect options are enabled by default.
@@ -59,12 +58,35 @@ sshfs user@host: ~/mnt/alias -o reconnect,compression=yes,ServerAliveInterval=15
 | fusermount | from FUSE     | Usually pre-installed on Linux      |
 | SSH config | working hosts | Hosts come from `~/.ssh/config`     |
 
+> [!NOTE]
+> For Mac users, see the macOS setup steps below.
+
+---
+
+## 🍏 macOS Setup
+
+To use **sshfs.yazi** on macOS, follow these steps:
+
+1. **Install macFUSE**
+   Download and install macFUSE from the official site:
+   [https://macfuse.github.io/](https://macfuse.github.io/)
+
+2. **Install SSHFS for macFUSE**
+   Use the official SSHFS releases compatible with macFUSE:
+   [https://github.com/macfuse/macfuse/wiki/File-Systems-%E2%80%90-SSHFS](https://github.com/macfuse/macfuse/wiki/File-Systems-%E2%80%90-SSHFS)
+
+3. **Install Yazi**
+   On macOS via Homebrew:
+
+   ```sh
+   brew install yazi
+   ```
+
 ## 📦 Installation
 
 Install the plugin via Yazi's package manager:
 
 ```sh
-# via Yazi’s package manager
 ya pkg add uhs-robert/sshfs
 ```
 
