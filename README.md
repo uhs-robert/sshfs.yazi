@@ -63,7 +63,7 @@ sshfs user@host: ~/mnt/alias -o reconnect,compression=yes,ServerAliveInterval=15
 
 ---
 
-## 🍏 macOS Setup
+### 🍏 macOS Setup
 
 To use **sshfs.yazi** on macOS, follow these steps:
 
@@ -182,15 +182,14 @@ require("sshfs"):setup({
 
 ## 🎹 Key Mapping
 
-### Recommended: Menu-based approach (avoids conflicts)
+### Recommended: Preset
 
-Add this to your `~/.config/yazi/keymap.toml` for a conflict-free approach that works well with [mount.yazi](https://github.com/yazi-rs/plugins/tree/main/mount.yazi):
+Add this to your `~/.config/yazi/keymap.toml` for a conflict-free approach that works well with other plugins:
 
 ```toml
 [mgr]
 prepend_keymap = [
   { on = ["M","s"], run = "plugin sshfs -- menu",            desc = "Open SSHFS options" },
-  { on = ["g","m"], run = "plugin sshfs -- jump",            desc = "Jump to SSHFS mount" },
 ]
 ```
 
@@ -198,43 +197,53 @@ The `M s` menu provides access to all SSHFS functions:
 
 - `m` → Mount & jump
 - `u` → Unmount
+- `j` → Jump to mount
 - `a` → Add host
 - `r` → Remove host
 - `h` → Go to mount home
 - `c` → Open ~/.ssh/config
 
-### Alternative: Direct keybinds (legacy support)
+> [!TIP]
+> `sshfs.yazi` uses the [array form for keymaps](https://yazi-rs.github.io/docs/configuration/keymap).
+> You must pick **only one style** per file; mixing with `[[mgr.prepend_keymap]]` will fail.
+>
+> **Also note:** some plugins (e.g., `mount.yazi`) bind a bare key like `on = "M"`,
+> which blocks all `M <key>` chords (including `M s`). Change those to chords
+> (e.g. `["M","m"]`) or choose a different prefix.
 
-If you prefer direct keybinds and don't use `mount.yazi``, you can use these instead:
+---
+
+### Alternative: Custom direct keybinds
+
+If you prefer direct keybinds, you may also set your own using our API. Here are the available options from the default preset:
 
 ```toml
 [mgr]
 prepend_keymap = [
   { on = ["M","m"], run = "plugin sshfs -- mount --jump",    desc = "Mount & jump" },
   { on = ["M","u"], run = "plugin sshfs -- unmount",         desc = "Unmount SSHFS" },
+  { on = ["M","j"], run = "plugin sshfs -- jump",            desc = "Jump to mount" },
   { on = ["M","a"], run = "plugin sshfs -- add",             desc = "Add SSH host" },
   { on = ["M","r"], run = "plugin sshfs -- remove",          desc = "Remove SSH host" },
   { on = ["M","h"], run = "plugin sshfs -- home",            desc = "Go to mount home" },
   { on = ["M","c"], run = "cd ~/.ssh/",                      desc = "Go to ssh config" },
-  { on = ["g","m"], run = "plugin sshfs -- jump",            desc = "Jump to mount" },
 ]
 ```
 
+> [!NOTE]
+> If you choose to use direct keybinds, you will be responsible for managing and handling any conflicts yourself.
+
 ## 🚀 Usage
 
-### Menu-based usage (recommended)
+### Example using the menu-based approach
 
 - **SSHFS Menu (`M s`):** Opens an interactive menu with all SSHFS options
-- **Jump to mount (`g m`):** Jump to any active mount from another tab or location
-
-### Direct keybind usage (if using legacy keybinds)
-
-- **Mount (`M m`):** Choose a host and select a remote directory (`~` or `/`). This works for hosts from your`~/.ssh/config` and any custom hosts you've added.
-- **Unmount (`M u`):** Choose an active mount to unmount it.
-- **Add host (`M a`):** Enter a custom host (`user@host`) for Yazi-only use (useful for quick testing or temp setups). For persistent, system-wide access, updating your `.ssh/config` is recommended.
-- **Remove host (`M r`):** Select and remove any Yazi-only hosts that you've added.
-- **Jump to mount (`g m`):** Jump to any active mount from another tab or location.
-- **Jump to mount home directory (`M h`):** Jump to the mount home directory.
+  - **Mount (`M m`):** Choose a host and select a remote directory (`~` or `/`). This works for hosts from your `~/.ssh/config` and any custom hosts you've added.
+  - **Unmount (`M u`):** Choose an active mount to unmount it.
+  - **Jump to mount (`M j`):** Jump to any active mount from another tab or location
+  - **Add host (`M a`):** Enter a custom host (`user@host`) for Yazi-only use (useful for quick testing or temp setups). For persistent, system-wide access, updating your `.ssh/config` is recommended.
+  - **Remove host (`M r`):** Select and remove any Yazi-only hosts that you've added.
+  - **Jump to mount home directory (`M h`):** Jump to the mount home directory.
 
 ## 💡 Tips and Performance
 
