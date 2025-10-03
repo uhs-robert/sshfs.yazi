@@ -811,6 +811,15 @@ local function add_mountpoint(alias, jump)
 	fs.remove("dir_clean", mountUrl) -- clean empty dir
 end
 
+local function check_alias_exists(alias)
+	for _, saved_alias in ipairs(read_lines(SAVE_LIST)) do
+		if saved_alias == alias then
+			return true
+		end
+	end
+	return false
+end
+
 --=========== api actions =================================================
 local function cmd_add_alias()
 	local alias = prompt("Enter SSH host:")
@@ -818,6 +827,9 @@ local function cmd_add_alias()
 		return false
 	elseif not alias:match("^[%w_.%-@]+:?[%w%-%.]*$") then
 		Notify.error("Host must be a valid SSH host string")
+		return
+	elseif check_alias_exists(alias) then
+		Notify.warn("Host already exists")
 		return
 	end
 	append_line(SAVE_LIST, alias)
