@@ -1,3 +1,4 @@
+-- main.lua
 -- ~/.config/yazi/plugins/sshfs/main.lua
 -- SSHFS integration for Yazi
 
@@ -782,14 +783,18 @@ local function add_mountpoint(alias, jump)
 		return finalize_mount(alias, mountPoint, jump)
 	end
 
-	-- Ask user to go to home or root folder
-	local mount_to_root = ya.which({
-		title = "Mount where?",
-		cands = {
-			{ on = "1", desc = "Home directory (~)" },
-			{ on = "2", desc = "Root directory (/)" },
-		},
-	}) == 2
+	-- Use config default or ask user to go to home or root folder
+	local map = { root = true, home = false }
+	local mount_to_root = map[config.default_mount_point]
+	if mount_to_root == nil then
+		mount_to_root = ya.which({
+			title = "Mount where?",
+			cands = {
+				{ on = "1", desc = "Home directory (~)" },
+				{ on = "2", desc = "Root directory (/)" },
+			},
+		}) == 2
+	end
 
 	-- Try key authentication, then try password authentication as fallback
 	local err_key_auth = try_key_auth(alias, mountPoint, mount_to_root, config)
@@ -1077,6 +1082,7 @@ end
 local default_config = {
 	mount_dir = HOME .. "/mnt",
 	password_attempts = 3, -- Number of password attempts before giving up
+	default_mount_point = "auto",
 	-- Default sshfs options
 	sshfs_options = {
 		"reconnect",

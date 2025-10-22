@@ -183,6 +183,9 @@ require("sshfs"):setup({
   -- Password authentication attempts before giving up
   password_attempts = 3,
 
+  -- Default mount point: Go to home, root, or always ask where to go
+  default_mount_point = "auto" -- home | root | auto
+
   -- SSHFS mount options (array of strings)
   -- These options are passed directly to the sshfs command
   sshfs_options = {
