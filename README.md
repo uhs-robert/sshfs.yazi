@@ -178,7 +178,7 @@ To customize plugin behavior, you may pass a config table to `setup()` (default 
 ```lua
 require("sshfs"):setup({
   -- Mount directory
-  mount_dir = "~/mnt",
+  mount_dir = os.getenv("HOME") .. "/mnt",
 
   -- Password authentication attempts before giving up
   password_attempts = 3,
