@@ -19,7 +19,7 @@ Thanks for your interest in contributing! Community feedback and support are alw
 
 - Use [Discussions](../../discussions) → **Ideas** to propose improvements or brainstorm.
 - If it’s well-formed and actionable, feel free to open a feature request issue.
-  
+
 ---
 
 ## 🧪 Running and Testing
@@ -27,8 +27,8 @@ Thanks for your interest in contributing! Community feedback and support are alw
 1. Follow the installation instructions in the [README](./README.md).
 2. Open `~/.config/yazi/plugins/sshfs.yazi/main.lua` and set `isDebugEnabled = true` near the top of the file.
 3. Debug logs will be written to: `~/.local/state/yazi/sshfs.log`
-5. You can directly edit `main.lua` to test changes. Just close and reopen Yazi to reload them.
-6. Please test against a variety of SSH setups if possible (key-based, password, root, etc).
+4. You can directly edit `main.lua` to test changes. Just close and reopen Yazi to reload them.
+5. Please test against a variety of SSH setups if possible (key-based, password, root, etc).
 
 ---
 
