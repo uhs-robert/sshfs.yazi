@@ -1,11 +1,23 @@
-# 📡 sshfs.yazi
+<p align="center">
+  <img
+    src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f4e1.svg"
+    width="128" height="128" alt="SSH emoji" />
+</p>
+<h1 align="center">sshfs.yazi</h1>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
-[![Yazi](https://img.shields.io/badge/Yazi-25.5%2B-blue?style=for-the-badge)](https://github.com/sxyazi/yazi)
-[![GitHub stars](https://img.shields.io/github/stars/uhs-robert/sshfs.yazi?style=for-the-badge)](https://github.com/uhs-robert/sshfs.yazi/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues-raw/uhs-robert/sshfs.yazi?style=for-the-badge)](https://github.com/uhs-robert/sshfs.yazi/issues)
+<p align="center">
+  <a href="https://github.com/uhs-robert/sshfs.yazi/stargazers"><img src="https://img.shields.io/github/stars/uhs-robert/sshfs.yazi?colorA=192330&colorB=skyblue&style=for-the-badge"></a>
+  <a href="https://github.com/sxyazi/yazi" target="_blank" rel="noopener noreferrer"><img alt="Yazi 0.25+" src="https://img.shields.io/badge/Yazi-0.25%2B-blue?style=for-the-badge&labelColor=192330" /></a>
+  <a href="https://github.com/uhs-robert/sshfs.yazi/issues"><img src="https://img.shields.io/github/issues/uhs-robert/sshfs.yazi?colorA=192330&colorB=khaki&style=for-the-badge"></a>
+  <a href="https://github.com/uhs-robert/sshfs.yazi/contributors"><img src="https://img.shields.io/github/contributors/uhs-robert/sshfs.yazi?colorA=192330&colorB=8FD1C7&style=for-the-badge"></a>
+  <a href="https://github.com/uhs-robert/sshfs.yazi/network/members"><img src="https://img.shields.io/github/forks/uhs-robert/sshfs.yazi?colorA=192330&colorB=CFA7FF&style=for-the-badge"></a>
+</p>
 
-A minimal, fast **SSHFS** integration for the [Yazi](https://github.com/sxyazi/yazi) terminal file‑manager.
+<p align="center">
+A minimal, blazing fast <strong>SSHFS</strong> integration for the <a target="_blank" rel="noopener noreferrer" href="https://github.com/sxyazi/yazi">Yazi</a> terminal file‑manager.
+</p>
+
+## 🕶️ What does it do?
 
 Mount any host from your `~/.ssh/config`, or add custom hosts, and browse remote files as if they were local. Jump between your local machine and remote mounts with a single keystroke.
 
