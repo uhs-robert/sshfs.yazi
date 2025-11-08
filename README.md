@@ -177,6 +177,7 @@ prepend_keymap = [
 
 - If key authentication fails, the plugin will prompt for a password up to 3 times before giving up.
 - SSH keys vastly speed up repeated mounts (no password prompt), leverage your `ssh_config` rather than manually adding hosts to make this as easy as possible.
+- **User Selection**: By setting `default_user = "prompt"` in your configuration, you can choose which user to login as when mounting (SSH config user, root, or custom username). This is useful when you need to switch between different user contexts on the same host. The default setting (`"auto"`) respects your SSH config without prompting.
 
 ## ⚙️ Configuration
 
@@ -196,7 +197,10 @@ require("sshfs"):setup({
   password_attempts = 3,
 
   -- Default mount point: Go to home, root, or always ask where to go
-  default_mount_point = "auto" -- home | root | auto
+  default_mount_point = "auto", -- home | root | auto
+
+  -- Default user selection: Use SSH config user or prompt for choice
+  default_user = "auto", -- auto | prompt
 
   -- SSHFS mount options (array of strings)
   -- These options are passed directly to the sshfs command

@@ -295,6 +295,49 @@ local function prompt(title, is_password, value)
 	return input_value
 end
 
+---Choose which user to login as. Returns modified alias if needed.
+---@param alias string The SSH alias (e.g., "user@host" or "host")
+---@param config table The plugin configuration
+---@return string|nil The final alias to use, or nil if cancelled
+local function choose_user(alias, config)
+	-- If not prompting, return original alias
+	if config.default_user ~= "prompt" then
+		return alias
+	end
+
+	-- Show user selection prompt
+	local choice = ya.which({
+		title = "Login as which user?",
+		cands = {
+			{ on = "1", desc = "User: Use SSH Config" },
+			{ on = "2", desc = "User: Root" },
+			{ on = "3", desc = "User: Custom" },
+		},
+	})
+
+	if not choice then
+		return nil
+	end
+
+	-- Extract hostname from alias
+	local hostname = alias:match("@(.+)$") or alias
+
+	-- Return based on choice
+	if choice == 1 then
+		return alias
+	elseif choice == 2 then
+		return "root@" .. hostname
+	elseif choice == 3 then
+		local custom_user = prompt("Enter username:")
+		if not custom_user or custom_user == "" then
+			return nil
+		end
+		return custom_user .. "@" .. hostname
+	end
+
+	return alias
+end
+
 ---Present a simple which‑key style selector and return the chosen item (Max: 36 options).
 ---@param title string
 ---@param items string[]
@@ -774,13 +817,23 @@ local function add_mountpoint(alias, jump)
 	local config = get_state(STATE_KEY.CONFIG)
 	local mount_dir = config.mount_dir
 	ensure_dir(Url(mount_dir))
-	local mountPoint = ("%s/%s"):format(mount_dir, alias)
+
+	-- Choose user before creating mount point
+	local original_alias = alias
+	local selected_alias = choose_user(alias, config)
+	if not selected_alias then
+		return
+	end
+
+	-- Use original alias for mount point directory name
+	local mountPoint = ("%s/%s"):format(mount_dir, original_alias)
 	local mountUrl = Url(mountPoint)
 	ensure_dir(mountUrl)
 
-	-- If already exists, jump to it
+	-- If mount already exists
 	if is_mount_active(mountPoint, mountUrl, mount_dir) then
-		return finalize_mount(alias, mountPoint, jump)
+		Notify.info("Already mounted at %s", mountPoint)
+		return finalize_mount(original_alias, mountPoint, jump)
 	end
 
 	-- Use config default or ask user to go to home or root folder
@@ -796,16 +849,16 @@ local function add_mountpoint(alias, jump)
 		}) == 2
 	end
 
-	-- Try key authentication, then try password authentication as fallback
-	local err_key_auth = try_key_auth(alias, mountPoint, mount_to_root, config)
+	-- Try key authentication with selected user alias
+	local err_key_auth = try_key_auth(selected_alias, mountPoint, mount_to_root, config)
 	if not err_key_auth then
-		return finalize_mount(alias, mountPoint, jump)
+		return finalize_mount(original_alias, mountPoint, jump)
 	end
 
 	-- Key auth failed → always try password authentication as fallback
-	local ok, pass_err = try_password_auth(alias, mountPoint, mount_to_root, config)
+	local ok, pass_err = try_password_auth(selected_alias, mountPoint, mount_to_root, config)
 	if ok then
-		return finalize_mount(alias, mountPoint, jump)
+		return finalize_mount(original_alias, mountPoint, jump)
 	elseif ok == false then
 		Notify.error("Authentication failed: " .. (pass_err or "unknown"))
 	else
@@ -1083,6 +1136,7 @@ local default_config = {
 	mount_dir = HOME .. "/mnt",
 	password_attempts = 3, -- Number of password attempts before giving up
 	default_mount_point = "auto",
+	default_user = "auto", -- "auto" (use SSH config user) or "prompt" (ask user)
 	-- Default sshfs options
 	sshfs_options = {
 		"reconnect",
