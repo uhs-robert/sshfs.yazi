@@ -770,6 +770,7 @@ local function remove_mountpoint(mp)
 		{ "fusermount", { "-u", mp } },
 		{ "fusermount3", { "-u", mp } },
 		{ "umount", { "-l", mp } },
+		{ "umount", { mp } },
 		{ "diskutil", { "unmount", mp } },
 	}
 
