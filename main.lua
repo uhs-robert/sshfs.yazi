@@ -685,7 +685,7 @@ local function parse_sshfs_mounts(mount_output, root)
 		pattern = "^(.+)%son%s(" .. root_escaped .. "/.-)%s+type%s+fuse%.sshfs"
 	else
 		-- macOS: (macfuse or (osxfuse
-		pattern = "^(.+)%son%s(" .. root_escaped .. "/[^%s]+)%s+%(.*fuse"
+		pattern = "^(.+)%son%s(" .. root_escaped .. "/[^%s]+)%s+%(.*[mo][as][cx]fuse"
 	end
 
 	for line in mount_output:gmatch("[^\r\n]+") do
