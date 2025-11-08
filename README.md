@@ -19,7 +19,7 @@ A minimal, blazing fast <strong>SSHFS</strong> integration for the <a target="_b
 
 ## 🕶️ What does it do?
 
-Mount any host from your `~/.ssh/config`, or add custom hosts, and browse remote files as if they were local. Jump between your local machine and remote mounts with a single keystroke.
+Mount any host from your `~/.ssh/config`, or add custom hosts, and browse remote files as if they were local. Mount specific remote directories (like `/var/log` or `/etc`) or the entire home/root filesystem. Jump between your local machine and remote mounts with a single keystroke.
 
 <https://github.com/user-attachments/assets/b7ef109a-0941-4879-b15a-a343262f0967>
 
@@ -51,7 +51,11 @@ This plugin serves as a wrapper for the `sshfs` command, integrating it seamless
 The core default `sshfs` command used is as follows (you may tweak these options and the mount directory with your setup settings):
 
 ```sh
+# Mount home directory
 sshfs user@host: ~/mnt/alias -o reconnect,compression=yes,ServerAliveInterval=15,ServerAliveCountMax=3
+
+# Mount specific remote directory (when configured in alias)
+sshfs user@host:/var/log ~/mnt/alias-var-log -o reconnect,compression=yes,ServerAliveInterval=15,ServerAliveCountMax=3
 ```
 
 ## ✨ Features
@@ -166,10 +170,10 @@ prepend_keymap = [
 ### 📝 Example using the recommended preset
 
 - **SSHFS Menu (`M s`):** Opens an interactive menu with all SSHFS options
-  - **Mount (`M m`):** Choose a host and select a remote directory (`~` or `/`). This works for hosts from your `~/.ssh/config` and any custom hosts you've added.
+  - **Mount (`M m`):** Choose a host and select a remote directory (`~` or `/`). This works for hosts from your `~/.ssh/config` and any custom hosts you've added. Custom hosts with specific remote paths configured will mount directly to that path.
   - **Unmount (`M u`):** Choose an active mount to unmount it.
   - **Jump to mount (`M j`):** Jump to any active mount from another tab or location
-  - **Add host (`M a`):** Enter a custom host (`user@host`) for Yazi-only use (useful for quick testing or temp setups). For persistent, system-wide access, updating your `.ssh/config` is recommended.
+  - **Add host (`M a`):** Enter a custom host (`user@host`) and optionally specify a remote directory (e.g., `/var/log`, `/etc/nginx`) to create an alias for that specific path. When you mount this alias later, it will go directly to that remote directory. This is useful for frequently accessed remote directories or quick testing. For persistent, system-wide access, updating your `.ssh/config` is recommended.
   - **Remove host (`M r`):** Select and remove any Yazi-only hosts that you've added.
   - **Jump to mount home directory (`M h`):** Jump to the mount home directory.
 
