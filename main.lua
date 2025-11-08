@@ -1,5 +1,4 @@
 -- main.lua
--- ~/.config/yazi/plugins/sshfs/main.lua
 -- SSHFS integration for Yazi
 
 --=========== Plugin Settings =================================================
@@ -486,6 +485,75 @@ choose = function(title, items, config)
 	end
 end
 
+--============== Host Entry Parsing ====================================
+---Parse a host entry that may contain a remote path
+---@param entry string Host entry like "myserver" or "myserver:/var/log"
+---@return string hostname, string|nil remote_path
+local function parse_host_entry(entry)
+	local parts = {}
+	for part in entry:gmatch("[^:]+") do
+		table.insert(parts, part)
+	end
+
+	-- Patterns: "hostname:port" or "hostname:/path" or "hostname:port:/path"
+	if #parts == 1 then
+		return entry, nil
+	elseif #parts == 2 then
+		if parts[2]:sub(1, 1) == "/" then -- Path
+			return parts[1], parts[2]
+		else
+			return entry, nil -- Port
+		end
+	elseif #parts >= 3 then
+		if parts[#parts]:sub(1, 1) == "/" then -- Last part is a path
+			local hostname = table.concat(parts, ":", 1, #parts - 1)
+			return hostname, parts[#parts]
+		else
+			return entry, nil
+		end
+	end
+
+	return entry, nil
+end
+
+---Generate a mount point suffix from a remote path
+---Truncates to last 2 path components for brevity
+---@param remote_path string Remote path like "/var/log" or "/var/lib/docker/volumes"
+---@return string suffix Truncated like "var-log" or "docker-volumes"
+local function generate_mount_suffix(remote_path)
+	if not remote_path or remote_path == "" then
+		return ""
+	end
+
+	-- Strip trailing slashes
+	remote_path = remote_path:gsub("/+$", "")
+
+	-- Special case for root
+	if remote_path == "/" or remote_path == "" then
+		return "root"
+	end
+
+	-- Split path into components
+	local components = {}
+	for component in remote_path:gmatch("[^/]+") do
+		table.insert(components, component)
+	end
+
+	-- Take last 2 components (or less)
+	local count = math.min(2, #components)
+	local suffix_parts = {}
+	for i = #components - count + 1, #components do
+		table.insert(suffix_parts, components[i])
+	end
+
+	-- Sanitize path
+	local suffix = table.concat(suffix_parts, "-")
+	suffix = suffix:gsub("[^%w%-_]", "-")
+	suffix = suffix:gsub("%-+", "-")
+
+	return suffix
+end
+
 --============== File helpers ====================================
 ---Check if a path exists and is a directory
 ---@param url Url
@@ -603,16 +671,16 @@ end
 --- Parses `mount` output to find sshfs paths under a given root
 ---@param mount_output string
 ---@param root string
----@return string[] -- list of absolute mount paths
+---@return table[] -- list of {path: string, remote: string}
 local function parse_sshfs_mounts(mount_output, root)
 	local mounts = {}
 	local root_escaped = root:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1")
-	local pattern = "^.+%son%s(" .. root_escaped .. "/.-)%s+type%s+fuse%.sshfs"
+	local pattern = "^(.+)%son%s(" .. root_escaped .. "/.-)%s+type%s+fuse%.sshfs"
 
 	for line in mount_output:gmatch("[^\r\n]+") do
-		local path = line:match(pattern)
-		if path then
-			mounts[#mounts + 1] = path
+		local remote, path = line:match(pattern)
+		if path and remote then
+			mounts[#mounts + 1] = { path = path, remote = remote }
 		end
 	end
 
@@ -636,8 +704,8 @@ local function is_mount_active(path, url, mount_dir)
 	end
 
 	local mounts = parse_sshfs_mounts(output.stdout, mount_dir)
-	for _, mounted_path in ipairs(mounts) do
-		if mounted_path == path then
+	for _, mount_info in ipairs(mounts) do
+		if mount_info.path == path then
 			return true
 		end
 	end
@@ -647,7 +715,7 @@ end
 
 ---Lists all active mount points
 ---@param mount_dir string
----@return { alias: string, path: string }[]
+---@return { alias: string, path: string, remote: string|nil }[]
 local function list_mounts(mount_dir)
 	local mounts = {}
 
@@ -666,15 +734,15 @@ local function list_mounts(mount_dir)
 			if is_dir(url) and is_mount_active(path, url, mount_dir) then
 				local alias = file.name
 				debug("Active mount #%d: %s", i, url)
-				mounts[#mounts + 1] = { alias = alias, path = path }
+				mounts[#mounts + 1] = { alias = alias, path = path, remote = nil }
 			end
 		end
 	else
-		for _, path in ipairs(parse_sshfs_mounts(output.stdout, mount_dir)) do
-			local alias = path:match("([^/]+)$")
+		for _, mount_info in ipairs(parse_sshfs_mounts(output.stdout, mount_dir)) do
+			local alias = mount_info.path:match("([^/]+)$")
 			if alias then
-				debug("Active mount: %s", path)
-				mounts[#mounts + 1] = { alias = alias, path = path }
+				debug("Active mount: %s from %s", mount_info.path, mount_info.remote)
+				mounts[#mounts + 1] = { alias = alias, path = mount_info.path, remote = mount_info.remote }
 			end
 		end
 	end
@@ -706,6 +774,65 @@ local function remove_mountpoint(mp)
 end
 
 --======== Mount functions ============================================
+---Get display-friendly path for user messages
+---@param remote_path string|nil Custom remote path
+---@param mount_to_root boolean Whether mounting to root
+---@return string display_path The path to show to user ("~", "/", or custom path)
+local function get_display_path(remote_path, mount_to_root)
+	if remote_path then
+		return remote_path
+	elseif mount_to_root then
+		return "/"
+	else
+		return "~"
+	end
+end
+
+---Check if error indicates a non-existent remote directory
+---@param error_msg string The error message
+---@return boolean is_not_found True if directory doesn't exist
+local function is_directory_not_found_error(error_msg)
+	return error_msg and error_msg:match("No such file or directory") ~= nil
+end
+
+---Check if error indicates a connection problem
+---@param error_msg string The error message
+---@return boolean is_connection_error True if it's a connection error
+local function is_connection_error(error_msg)
+	return error_msg and (
+		error_msg:match("Connection refused") or
+		error_msg:match("Connection timed out") or
+		error_msg:match("Could not resolve hostname")
+	) ~= nil
+end
+
+---Construct the remote path for sshfs
+---@param alias string The SSH alias/hostname
+---@param mount_to_root boolean Whether to mount to root
+---@param custom_remote_path string|nil Optional custom remote path
+---@return string remote_path The constructed remote path (e.g., "alias:/var/log")
+local function construct_remote_path(alias, mount_to_root, custom_remote_path)
+	if custom_remote_path then
+		return alias .. ":" .. custom_remote_path
+	else
+		return alias .. ":" .. (mount_to_root and "/" or "")
+	end
+end
+
+---Build sshfs command arguments
+---@param remote_path string The remote path (e.g., "alias:/var/log")
+---@param mountPoint string The local mount point
+---@param options string[] SSHFS options
+---@return string[] args The command arguments
+local function build_sshfs_args(remote_path, mountPoint, options)
+	return {
+		remote_path,
+		mountPoint,
+		"-o",
+		table.concat(options, ","),
+	}
+end
+
 ---Get sshfs user config options
 ---@param type "key"|"password"
 ---@param config table|nil Optional config to avoid state retrieval
@@ -738,19 +865,14 @@ end
 ---@param alias string
 ---@param mountPoint string
 ---@param mount_to_root boolean
+---@param custom_remote_path string|nil Optional custom remote path
 ---@param config table|nil Optional config to avoid state retrieval
 ---@return string|nil err_msg, Output|nil output
-local function try_key_auth(alias, mountPoint, mount_to_root, config)
+local function try_key_auth(alias, mountPoint, mount_to_root, custom_remote_path, config)
 	mount_to_root = mount_to_root or false
 	local options = getConfigForSSHFS("key", config)
-
-	local remote_path = alias .. ":" .. (mount_to_root and "/" or "")
-	local args = {
-		remote_path,
-		mountPoint,
-		"-o",
-		table.concat(options, ","),
-	}
+	local remote_path = construct_remote_path(alias, mount_to_root, custom_remote_path)
+	local args = build_sshfs_args(remote_path, mountPoint, options)
 
 	local err, output = run_command("sshfs", args, nil, true) --silent
 	if output and output.status and output.status.success then
@@ -764,20 +886,16 @@ end
 ---@param alias string
 ---@param mountPoint string
 ---@param mount_to_root boolean
+---@param custom_remote_path string|nil Optional custom remote path
 ---@param config table|nil Optional config to avoid state retrieval
 ---@return boolean? result, string? reason
-local function try_password_auth(alias, mountPoint, mount_to_root, config)
+local function try_password_auth(alias, mountPoint, mount_to_root, custom_remote_path, config)
 	mount_to_root = mount_to_root or false
 	config = config or get_state(STATE_KEY.CONFIG)
 	local max_attempts = (config and config.password_attempts) or 3
 	local options = getConfigForSSHFS("password", config)
-	local remote_path = alias .. ":" .. (mount_to_root and "/" or "")
-	local args = {
-		remote_path,
-		mountPoint,
-		"-o",
-		table.concat(options, ","),
-	}
+	local remote_path = construct_remote_path(alias, mount_to_root, custom_remote_path)
+	local args = build_sshfs_args(remote_path, mountPoint, options)
 
 	debug("Attempting password authentication for %s with options: %s", alias, table.concat(options, ","))
 
@@ -799,6 +917,22 @@ local function try_password_auth(alias, mountPoint, mount_to_root, config)
 	return false, last_err
 end
 
+---Check if a hostname already has an active mount
+---@param hostname string The hostname (without remote path)
+---@param mount_dir string The mount directory
+---@return string|nil mount_path The path to the existing mount, or nil if not mounted
+local function check_existing_mount(hostname, mount_dir)
+	local mounts = list_mounts(mount_dir)
+	for _, mount in ipairs(mounts) do
+		-- Extract hostname from mount alias
+		local mount_hostname = mount.alias:match("^([^%-]+)")
+		if mount_hostname == hostname then
+			return mount.path
+		end
+	end
+	return nil
+end
+
 ---Handles exit conditions after mount is done
 ---@param alias string
 ---@param mountPoint string
@@ -811,54 +945,92 @@ local function finalize_mount(alias, mountPoint, jump)
 end
 
 ---Adds a mountpoint
----@param alias string
+---@param entry string Host entry (may include remote path like "host:/var/log")
 ---@param jump boolean
-local function add_mountpoint(alias, jump)
+local function add_mountpoint(entry, jump)
 	local config = get_state(STATE_KEY.CONFIG)
 	local mount_dir = config.mount_dir
 	ensure_dir(Url(mount_dir))
 
+	-- Parse entry to extract hostname and optional remote path
+	local hostname, remote_path = parse_host_entry(entry)
+	debug("Parsed entry: hostname=%s, remote_path=%s", hostname, remote_path or "nil")
+
+	-- Check if this hostname already has an active mount
+	local existing_mount = check_existing_mount(hostname, mount_dir)
+	if existing_mount then
+		Notify.warn(("Host %s is already mounted at %s. Unmount it first."):format(hostname, existing_mount))
+		return
+	end
+
 	-- Choose user before creating mount point
-	local original_alias = alias
-	local selected_alias = choose_user(alias, config)
+	local original_hostname = hostname
+	local selected_alias = choose_user(hostname, config)
 	if not selected_alias then
 		return
 	end
 
-	-- Use original alias for mount point directory name
-	local mountPoint = ("%s/%s"):format(mount_dir, original_alias)
+	-- Generate mount point directory name,
+	local mountPoint
+	if remote_path then
+		local suffix = generate_mount_suffix(remote_path)
+		mountPoint = ("%s/%s-%s"):format(mount_dir, original_hostname, suffix)
+	else
+		mountPoint = ("%s/%s"):format(mount_dir, original_hostname)
+	end
+
 	local mountUrl = Url(mountPoint)
 	ensure_dir(mountUrl)
 
-	-- If mount already exists
+	-- If mount already exists at this exact location
 	if is_mount_active(mountPoint, mountUrl, mount_dir) then
 		Notify.info("Already mounted at %s", mountPoint)
-		return finalize_mount(original_alias, mountPoint, jump)
+		return finalize_mount(entry, mountPoint, jump)
 	end
 
-	-- Use config default or ask user to go to home or root folder
-	local map = { root = true, home = false }
-	local mount_to_root = map[config.default_mount_point]
-	if mount_to_root == nil then
-		mount_to_root = ya.which({
-			title = "Mount where?",
-			cands = {
-				{ on = "1", desc = "Home directory (~)" },
-				{ on = "2", desc = "Root directory (/)" },
-			},
-		}) == 2
+	-- Determine mount target (home, root, or custom path)
+	local mount_to_root = false
+	if remote_path then
+		debug("Using custom remote path: %s", remote_path)
+	else
+		local map = { root = true, home = false }
+		mount_to_root = map[config.default_mount_point]
+		if mount_to_root == nil then
+			mount_to_root = ya.which({
+				title = "Mount where?",
+				cands = {
+					{ on = "1", desc = "Home directory (~)" },
+					{ on = "2", desc = "Root directory (/)" },
+				},
+			}) == 2
+		end
 	end
 
 	-- Try key authentication with selected user alias
-	local err_key_auth = try_key_auth(selected_alias, mountPoint, mount_to_root, config)
+	local err_key_auth, output_key_auth = try_key_auth(selected_alias, mountPoint, mount_to_root, remote_path, config)
 	if not err_key_auth then
-		return finalize_mount(original_alias, mountPoint, jump)
+		return finalize_mount(entry, mountPoint, jump)
 	end
 
-	-- Key auth failed → always try password authentication as fallback
-	local ok, pass_err = try_password_auth(selected_alias, mountPoint, mount_to_root, config)
+	-- Check if error is due to non-existent remote directory
+	if is_directory_not_found_error(err_key_auth) then
+		local display_path = get_display_path(remote_path, mount_to_root)
+		Notify.error("Remote directory does not exist: %s:%s", selected_alias, display_path)
+		fs.remove("dir_clean", mountUrl)
+		return
+	end
+
+	-- Check if error is due to other non-auth issues (connection, permissions, etc.)
+	if is_connection_error(err_key_auth) then
+		Notify.error("Connection error: %s", err_key_auth)
+		fs.remove("dir_clean", mountUrl)
+		return
+	end
+
+	-- Key auth failed (likely auth issue) → try password authentication as fallback
+	local ok, pass_err = try_password_auth(selected_alias, mountPoint, mount_to_root, remote_path, config)
 	if ok then
-		return finalize_mount(original_alias, mountPoint, jump)
+		return finalize_mount(entry, mountPoint, jump)
 	elseif ok == false then
 		Notify.error("Authentication failed: " .. (pass_err or "unknown"))
 	else
@@ -878,18 +1050,88 @@ local function check_alias_exists(alias)
 	return false
 end
 
+--=========== Display helpers =================================================
+---Generate display labels for mounts with remote info if available
+---@param mounts table[] Array of mount info {alias, path, remote}
+---@return string[] labels Display labels for picker
+local function generate_mount_labels(mounts)
+	local labels = {}
+	for _, m in ipairs(mounts) do
+		if m.remote then
+			labels[#labels + 1] = m.remote .. " → " .. m.alias
+		else
+			labels[#labels + 1] = m.alias
+		end
+	end
+	return labels
+end
+
+---Find mount by matching label choice
+---@param labels string[] Array of display labels
+---@param choice string The selected label
+---@param mounts table[] Array of mount info
+---@return table|nil mount The matched mount info, or nil if not found
+local function find_mount_by_label(labels, choice, mounts)
+	for i, label in ipairs(labels) do
+		if label == choice then
+			return mounts[i]
+		end
+	end
+	return nil
+end
+
+---Get active mounts with empty check
+---@param warn_message string|nil Warning message if no mounts (optional)
+---@return table[]|nil mounts Array of mount info, or nil if none found
+local function get_active_mounts_or_warn(warn_message)
+	local config = get_state(STATE_KEY.CONFIG)
+	local mount_dir = config.mount_dir
+	local mounts = list_mounts(mount_dir)
+	if #mounts == 0 then
+		if warn_message then
+			Notify.warn(warn_message)
+		end
+		return nil
+	end
+	return mounts
+end
+
 --=========== api actions =================================================
 local function cmd_add_alias()
-	local alias = prompt("Enter SSH host:")
-	if alias == nil then
+	local host = prompt("Enter SSH host:")
+	if host == nil then
 		return false
-	elseif not alias:match("^[%w_.%-@]+:?[%w%-%.]*$") then
+	elseif not host:match("^[%w_.%-@]+:?[%w%-%.]*$") then
 		Notify.error("Host must be a valid SSH host string")
 		return
-	elseif check_alias_exists(alias) then
+	elseif check_alias_exists(host) then
 		Notify.warn("Host already exists")
 		return
 	end
+
+	-- Prompt for optional remote directory
+	local remote_dir = prompt("Remote directory (optional, default is ~):")
+	if remote_dir == nil then
+		return
+	end
+
+	-- Validate remote directory if provided
+	local alias = host
+	if remote_dir and remote_dir ~= "" then
+		-- Validate path starts with /
+		if not remote_dir:match("^/") then
+			Notify.error("Remote directory must be an absolute path starting with /")
+			return
+		end
+		alias = host .. ":" .. remote_dir
+	end
+
+	-- Check if the full alias (with path) already exists
+	if check_alias_exists(alias) then
+		Notify.warn("Host alias already exists")
+		return
+	end
+
 	append_line(SAVE_LIST, alias)
 	debug("Saved host alias `%s`", alias)
 
@@ -909,6 +1151,8 @@ local function cmd_add_alias()
 		-- Update the save file mtime
 		host_cache.save_file_mtime = get_file_mtime(SAVE_LIST)
 	end
+
+	Notify.info(("Added %s to custom hosts"):format(alias))
 end
 
 local function cmd_remove_alias()
@@ -985,67 +1229,57 @@ end
 
 local function cmd_jump()
 	-- Get active mounts
-	local config = get_state(STATE_KEY.CONFIG)
-	local mount_dir = config.mount_dir
-	local mounts = list_mounts(mount_dir)
-	if #mounts == 0 then
-		return Notify.warn("No active mounts to jump to")
+	local mounts = get_active_mounts_or_warn("No active mounts to jump to")
+	if not mounts then
+		return
 	end
+
 	-- Choose mount to jump to
-	local labels = {}
-	for _, m in ipairs(mounts) do
-		labels[#labels + 1] = m.alias
-	end
+	local config = get_state(STATE_KEY.CONFIG)
+	local labels = generate_mount_labels(mounts)
 	local choice = (#labels == 1) and labels[1] or choose("Jump to mount", labels, config)
-	-- Jump to directory
 	if not choice then
 		return
 	end
-	for _, m in ipairs(mounts) do
-		if m.alias == choice then
-			ya.emit("cd", { m.path, raw = true })
-		end
+
+	-- Find and jump to the selected mount
+	local mount = find_mount_by_label(labels, choice, mounts)
+	if mount then
+		ya.emit("cd", { mount.path, raw = true })
 	end
 end
 
 local function cmd_unmount()
 	-- Get active mounts
+	local mounts = get_active_mounts_or_warn("No SSHFS mounts are active")
+	if not mounts then
+		return
+	end
+
+	-- Choose alias to unmount
 	local config = get_state(STATE_KEY.CONFIG)
-	local mount_dir = config.mount_dir
-	local mounts = list_mounts(mount_dir)
-	if #mounts == 0 then
-		Notify.warn("No SSHFS mounts are active")
+	local labels = generate_mount_labels(mounts)
+	local choice = (#labels == 1) and labels[1] or choose("Unmount which?", labels, config)
+	if not choice then
 		return
 	end
-	-- choose alias to unmount
-	local aliases = {}
-	for _, m in ipairs(mounts) do
-		aliases[#aliases + 1] = m.alias
-	end
-	local alias = (#aliases == 1) and aliases[1] or choose("Unmount which?", aliases, config)
-	if not alias then
-		return
-	end
-	debug("Selected alias: `%s`", alias)
-	-- find its mount‑point
-	local mp
-	for _, m in ipairs(mounts) do
-		if m.alias == alias then
-			debug("Matching Alias: `%s`, Path: `%s`", m.alias, m.path)
-			mp = m.path
-			break
-		end
-	end
-	if not mp then
+
+	-- Find the selected mount
+	debug("Selected choice: `%s`", choice)
+	local mount = find_mount_by_label(labels, choice, mounts)
+	if not mount then
 		Notify.error("Internal error: mount‑point not found")
 		return
 	end
-	-- unmount it
-	redirect_unmounted_tabs_to_home(mp)
-	if remove_mountpoint(mp) then
-		Notify.info("Unmounted “" .. alias .. "”")
+
+	debug("Matching mount: `%s`, Path: `%s`", mount.alias, mount.path)
+
+	-- Unmount it
+	redirect_unmounted_tabs_to_home(mount.path)
+	if remove_mountpoint(mount.path) then
+		Notify.info("Unmounted " .. mount.alias .. "")
 	else
-		Notify.error("Failed to unmount “" .. alias)
+		Notify.error("Failed to unmount " .. mount.alias)
 	end
 end
 
