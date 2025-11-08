@@ -675,7 +675,18 @@ end
 local function parse_sshfs_mounts(mount_output, root)
 	local mounts = {}
 	local root_escaped = root:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1")
-	local pattern = "^(.+)%son%s(" .. root_escaped .. "/.-)%s+type%s+fuse%.sshfs"
+
+	-- Detect platform
+	local is_macos = (package.config:sub(1,1) == '/' and io.popen("uname"):read("*l") == "Darwin")
+
+	local pattern
+	if not is_macos then
+		-- Linux: fuse.sshfs
+		pattern = "^(.+)%son%s(" .. root_escaped .. "/.-)%s+type%s+fuse%.sshfs"
+	else
+		-- macOS: (macfuse or (osxfuse
+		pattern = "^(.+)%son%s(" .. root_escaped .. "/[^%s]+)%s+%(.*[mo][as][cx]fuse"
+	end
 
 	for line in mount_output:gmatch("[^\r\n]+") do
 		local remote, path = line:match(pattern)
@@ -759,6 +770,8 @@ local function remove_mountpoint(mp)
 		{ "fusermount", { "-u", mp } },
 		{ "fusermount3", { "-u", mp } },
 		{ "umount", { "-l", mp } },
+		{ "umount", { mp } },
+		{ "diskutil", { "unmount", mp } },
 	}
 
 	for _, cmd in ipairs(attempts) do
