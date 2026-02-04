@@ -258,7 +258,7 @@ local function prompt(title, is_password, value)
     title = title,
     value = value or "",
     obscure = is_password or false,
-    position = { "center", y = 3, w = 60 },
+    pos = { "center", y = 3, w = 60 },
   })
 
   if input_event ~= 1 then return nil end
