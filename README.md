@@ -195,7 +195,7 @@ To customize plugin behavior, you may pass a config table to `setup()` (default 
 ```lua
 require("sshfs"):setup({
   -- Custom hosts file
-  custom_hosts_file = (os.getenv("XDG_DATA_HOME") or ("~/.local/share")) .. "/yazi/sshfs.list",
+  custom_hosts_file = (os.getenv("XDG_DATA_HOME") or (os.getenv("HOME") .. "/.local/share")) .. "/yazi/sshfs.list",
 
   -- Mount directory
   mount_dir = os.getenv("HOME") .. "/mnt",
