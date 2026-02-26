@@ -46,7 +46,7 @@ Perfect for tweaking configs, deploying sites, inspecting logs, or just grabbing
 
 ## 🧠 What it does under the hood
 
-This plugin serves as a wrapper for the `sshfs` command, integrating it seamlessly with Yazi. It automatically reads hosts from your `~/.ssh/config` file. Additionally, it maintains a separate list of custom hosts in `~/.config/yazi/sshfs.list`.
+This plugin serves as a wrapper for the `sshfs` command, integrating it seamlessly with Yazi. It automatically reads hosts from your `~/.ssh/config` file. Additionally, it maintains a separate list of custom hosts which is by default stored in `$XDG_DATA_HOME/yazi/sshfs.list`, or if `$XDG_DATA_HOME` is note defined, in `~/.local/share/yazi/sshfs.list`.
 
 The core default `sshfs` command used is as follows (you may tweak these options and the mount directory with your setup settings):
 
@@ -194,6 +194,9 @@ To customize plugin behavior, you may pass a config table to `setup()` (default 
 
 ```lua
 require("sshfs"):setup({
+  -- Custom hosts file
+  custom_hosts_file = (os.getenv("XDG_DATA_HOME") or ("~/.local/share")) .. "/yazi/sshfs.list",
+
   -- Mount directory
   mount_dir = os.getenv("HOME") .. "/mnt",
 
