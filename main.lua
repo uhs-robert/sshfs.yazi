@@ -323,7 +323,7 @@ end
 ---@param items string[]
 ---@return string|nil
 local function choose_with_fzf(title, items)
-  local permit = ui.hide()
+  local permit = ui.hide and ui.hide() or ya.hide()
   local result = nil
 
   local items_str = table.concat(items, "\n")
