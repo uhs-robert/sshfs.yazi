@@ -17,7 +17,7 @@
 A minimal, blazing fast <strong>SSHFS</strong> integration for the <a target="_blank" rel="noopener noreferrer" href="https://github.com/sxyazi/yazi">Yazi</a> terminal file‑manager.
 </p>
 
-<details>
+<details align="center">
 <summary>✨ What's New / 🚨 Breaking Changes</summary>
 <br/>
 <!-- whats-new:start -->
@@ -25,21 +25,23 @@ A minimal, blazing fast <strong>SSHFS</strong> integration for the <a target="_b
   <details>
     <summary>🚨 v2.0: Custom host file relocated (migration required)</summary>
     <!-- v2.0:start -->
-    <h3>🚨 BREAKING CHANGE: <code>sshfs.list</code> relocated to follow XDG Base Directory spec</h3>
-    <p>
-      The custom hosts file has moved from <code>~/.config/yazi/sshfs.list</code> to
-      <code>$XDG_DATA_HOME/yazi/sshfs.list</code> (this is usually located in <code>~/.local/share/yazi/sshfs.list</code>).
-    </p>
-    <p><strong>If you have custom hosts saved, migrate your file before upgrading:</strong></p>
-    <pre>mv ~/.config/yazi/sshfs.list ~/.local/share/yazi/sshfs.list</pre>
-    <p>
-      If <code>$XDG_DATA_HOME</code> is set to a custom path, use that instead:
-    </p>
-    <pre>mv ~/.config/yazi/sshfs.list "$XDG_DATA_HOME/yazi/sshfs.list"</pre>
-    <p>
-      Hosts from <code>~/.ssh/config</code> are unaffected. Only manually added custom hosts need migration.
-      If you have no custom hosts then no action is needed.
-    </p>
+    <div align="left">
+      <h3>🚨 BREAKING CHANGE: <code>sshfs.list</code> relocated to follow XDG Base Directory spec</h3>
+      <p>
+        The custom hosts file has moved from <code>~/.config/yazi/sshfs.list</code> to
+        <code>$XDG_DATA_HOME/yazi/sshfs.list</code> (this is usually located in <code>~/.local/share/yazi/sshfs.list</code>).
+      </p>
+      <p><strong>If you have custom hosts saved, migrate your file before upgrading:</strong></p>
+      <pre>mv ~/.config/yazi/sshfs.list ~/.local/share/yazi/sshfs.list</pre>
+      <p>
+        If <code>$XDG_DATA_HOME</code> is set to a custom path, use that instead:
+      </p>
+      <pre>mv ~/.config/yazi/sshfs.list "$XDG_DATA_HOME/yazi/sshfs.list"</pre>
+      <p>
+        Hosts from <code>~/.ssh/config</code> are unaffected. Only manually added custom hosts need migration.
+        If you have no custom hosts then no action is needed.
+      </p>
+    </div>
     <!-- v2.0:end -->
 
   </details>
