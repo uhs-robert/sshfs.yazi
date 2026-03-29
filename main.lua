@@ -1323,6 +1323,7 @@ end
 
 ---Setup
 function M:setup(cfg)
+  if cfg == nil and type(self) == "table" and self ~= M then cfg = self end
   set_plugin_config(cfg)
   local config = get_state(STATE_KEY.CONFIG)
   local parent = config.custom_hosts_file:match("^(.+)/[^/]+$")
