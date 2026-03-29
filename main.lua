@@ -11,8 +11,7 @@ local XDG_RUNTIME_DIR = os.getenv("XDG_RUNTIME_DIR") or ("/run/user/" .. USER_ID
 --=========== Paths ===========================================================
 local HOME = os.getenv("HOME")
 local SSH_CONFIG = HOME .. "/.ssh/config"
-local YAZI_DIR = HOME .. "/.config/yazi"
-local SAVE_LIST = YAZI_DIR .. "/sshfs.list" -- list of remembered aliases
+local XDG_DATA_HOME = os.getenv("XDG_DATA_HOME") or (HOME .. "/.local/share")
 
 --=========== Plugin State ===========================================================
 ---@enum
@@ -569,10 +568,11 @@ end
 
 --============== Cache state management ====================================
 ---Check if host cache is valid by comparing file modification times
+---@param hosts_filename string
 ---@return boolean
-local function is_host_cache_valid()
+local function is_host_cache_valid(hosts_filename)
   local ssh_config_mtime = get_file_mtime(SSH_CONFIG)
-  local save_file_mtime = get_file_mtime(SAVE_LIST)
+  local save_file_mtime = get_file_mtime(hosts_filename)
 
   return (
     host_cache.hosts ~= nil
@@ -583,9 +583,10 @@ end
 
 ---Update host cache with current file modification times
 ---@param hosts string[]
-local function update_host_cache(hosts)
+---@param hosts_filename string
+local function update_host_cache(hosts, hosts_filename)
   local ssh_config_mtime = get_file_mtime(SSH_CONFIG)
-  local save_file_mtime = get_file_mtime(SAVE_LIST)
+  local save_file_mtime = get_file_mtime(hosts_filename)
 
   host_cache.hosts = hosts
   host_cache.ssh_config_mtime = ssh_config_mtime
@@ -593,27 +594,28 @@ local function update_host_cache(hosts)
 end
 
 ---Get list of all available hosts (from SSH config and custom list)
+---@param hosts_filename string
 ---@return string[]
-local function get_all_hosts()
-  if is_host_cache_valid() then return host_cache.hosts end
+local function get_all_hosts(hosts_filename)
+  if is_host_cache_valid(hosts_filename) then return host_cache.hosts end
 
   local ssh_config_hosts = read_ssh_config_hosts()
   local hosts
 
   -- Check if custom hosts file exists
-  local url = Url(SAVE_LIST)
+  local url = Url(hosts_filename)
   local cha, _ = fs.cha(url)
 
   if cha then
     -- Custom hosts file exists - combine SSH config and saved hosts
-    local saved_hosts = read_lines(SAVE_LIST)
+    local saved_hosts = read_lines(hosts_filename)
     hosts = unique(list_extend(saved_hosts, ssh_config_hosts))
   else
     -- No custom hosts file - only use SSH config
     hosts = ssh_config_hosts
   end
 
-  update_host_cache(hosts)
+  update_host_cache(hosts, hosts_filename)
   return hosts
 end
 
@@ -984,8 +986,8 @@ local function add_mountpoint(entry, jump)
   fs.remove("dir_clean", mountUrl) -- clean empty dir
 end
 
-local function check_alias_exists(alias)
-  for _, saved_alias in ipairs(read_lines(SAVE_LIST)) do
+local function check_alias_exists(alias, hosts_filename)
+  for _, saved_alias in ipairs(read_lines(hosts_filename)) do
     if saved_alias == alias then return true end
   end
   return false
@@ -1035,13 +1037,14 @@ end
 
 --=========== api actions =================================================
 local function cmd_add_alias()
+  local config = get_state(STATE_KEY.CONFIG)
   local host = prompt("Enter SSH host:")
   if host == nil then
     return false
   elseif not host:match("^[%w_.%-@]+:?[%w%-%.]*$") then
     Notify.error("Host must be a valid SSH host string")
     return
-  elseif check_alias_exists(host) then
+  elseif check_alias_exists(host, config.custom_hosts_file) then
     Notify.warn("Host already exists")
     return
   end
@@ -1062,12 +1065,12 @@ local function cmd_add_alias()
   end
 
   -- Check if the full alias (with path) already exists
-  if check_alias_exists(alias) then
+  if check_alias_exists(alias, config.custom_hosts_file) then
     Notify.warn("Host alias already exists")
     return
   end
 
-  append_line(SAVE_LIST, alias)
+  append_line(config.custom_hosts_file, alias)
   debug("Saved host alias `%s`", alias)
 
   -- Update cache
@@ -1082,15 +1085,16 @@ local function cmd_add_alias()
     end
     if not found then table.insert(host_cache.hosts, alias) end
     -- Update the save file mtime
-    host_cache.save_file_mtime = get_file_mtime(SAVE_LIST)
+    host_cache.save_file_mtime = get_file_mtime(config.custom_hosts_file)
   end
 
   Notify.info(("Added %s to custom hosts"):format(alias))
 end
 
 local function cmd_remove_alias()
+  local config = get_state(STATE_KEY.CONFIG)
   -- Check if custom hosts file exists
-  local url = Url(SAVE_LIST)
+  local url = Url(config.custom_hosts_file)
   local cha, _ = fs.cha(url)
 
   if not cha then
@@ -1100,7 +1104,7 @@ local function cmd_remove_alias()
 
   -- Choose from saved aliases
   local config = get_state(STATE_KEY.CONFIG)
-  local saved_aliases = read_lines(SAVE_LIST)
+  local saved_aliases = read_lines(config.custom_hosts_file)
   local alias = choose("Remove which?", saved_aliases, config)
   if not alias then return end
 
@@ -1116,7 +1120,7 @@ local function cmd_remove_alias()
     debug("Deleted empty custom hosts file")
   else
     -- Overwrite the save list file with updated lines
-    local file, err = io.open(SAVE_LIST, "w")
+    local file, err = io.open(config.custom_hosts_file, "w")
     if not file then
       Notify.error("Failed to open save file: %s", tostring(err))
       return
@@ -1136,7 +1140,7 @@ local function cmd_remove_alias()
     end
     host_cache.hosts = new_hosts
     -- Update the save file mtime
-    host_cache.save_file_mtime = get_file_mtime(SAVE_LIST)
+    host_cache.save_file_mtime = get_file_mtime(config.custom_hosts_file)
   end
 
   Notify.info(("Alias “%s” removed from saved list"):format(alias))
@@ -1146,7 +1150,7 @@ local function cmd_mount(args)
   local config = get_state(STATE_KEY.CONFIG)
   -- Get alias_list
   local jump = args.jump == true
-  local alias_list = get_all_hosts()
+  local alias_list = get_all_hosts(config.custom_hosts_file)
   -- Choose alias to mount then add it
   local chosen_alias = (#alias_list == 1) and alias_list[1] or choose("Mount which host?", alias_list, config)
   if chosen_alias then add_mountpoint(chosen_alias, jump) end
@@ -1208,6 +1212,12 @@ local function cmd_open_ssh_config()
   ya.emit("cd", { HOME .. "/.ssh/", raw = true })
 end
 
+local function cmd_open_custom_hosts()
+  local config = get_state(STATE_KEY.CONFIG)
+  local parent = config.custom_hosts_file:match("^(.+)/[^/]+$")
+  ya.emit("cd", { parent, raw = true })
+end
+
 local function cmd_menu()
   local choice = ya.which({
     title = "SSHFS Menu",
@@ -1218,6 +1228,7 @@ local function cmd_menu()
       { on = "r", desc = "Remove host" },
       { on = "h", desc = "Go to mount home" },
       { on = "c", desc = "Open ~/.ssh/config" },
+      { on = "l", desc = "Open custom host list" },
     },
   })
 
@@ -1233,6 +1244,8 @@ local function cmd_menu()
     cmd_open_mount_dir()
   elseif choice == 6 then
     cmd_open_ssh_config()
+  elseif choice == 7 then
+    cmd_open_custom_hosts()
   end
 end
 
@@ -1282,6 +1295,7 @@ end
 --=========== Plugin start =================================================
 -- Default configuration
 local default_config = {
+  custom_hosts_file = XDG_DATA_HOME .. "/yazi/sshfs.list", -- list of remembered aliases
   mount_dir = HOME .. "/mnt",
   password_attempts = 3, -- Number of password attempts before giving up
   default_mount_point = "auto",
@@ -1310,6 +1324,9 @@ end
 ---Setup
 function M:setup(cfg)
   set_plugin_config(cfg)
+  local config = get_state(STATE_KEY.CONFIG)
+  local parent = config.custom_hosts_file:match("^(.+)/[^/]+$")
+  if parent then ensure_dir(Url(parent)) end
 end
 
 ---Entry
@@ -1331,6 +1348,8 @@ function M:entry(job)
     cmd_open_mount_dir()
   elseif action == "menu" then
     cmd_menu()
+  elseif action == "hosts" then
+    cmd_open_custom_hosts()
   else
     Notify.error("Unknown action")
   end
