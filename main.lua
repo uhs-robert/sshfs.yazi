@@ -1315,6 +1315,9 @@ end
 ---Setup
 function M:setup(cfg)
   set_plugin_config(cfg)
+  local config = get_state(STATE_KEY.CONFIG)
+  local parent = config.custom_hosts_file:match("^(.+)/[^/]+$")
+  if parent then ensure_dir(Url(parent)) end
 end
 
 ---Entry
