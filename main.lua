@@ -1212,6 +1212,12 @@ local function cmd_open_ssh_config()
   ya.emit("cd", { HOME .. "/.ssh/", raw = true })
 end
 
+local function cmd_open_custom_hosts()
+  local config = get_state(STATE_KEY.CONFIG)
+  local parent = config.custom_hosts_file:match("^(.+)/[^/]+$")
+  ya.emit("cd", { parent, raw = true })
+end
+
 local function cmd_menu()
   local choice = ya.which({
     title = "SSHFS Menu",
@@ -1222,6 +1228,7 @@ local function cmd_menu()
       { on = "r", desc = "Remove host" },
       { on = "h", desc = "Go to mount home" },
       { on = "c", desc = "Open ~/.ssh/config" },
+      { on = "l", desc = "Open custom host list" },
     },
   })
 
@@ -1237,6 +1244,8 @@ local function cmd_menu()
     cmd_open_mount_dir()
   elseif choice == 6 then
     cmd_open_ssh_config()
+  elseif choice == 7 then
+    cmd_open_custom_hosts()
   end
 end
 
@@ -1339,6 +1348,8 @@ function M:entry(job)
     cmd_open_mount_dir()
   elseif action == "menu" then
     cmd_menu()
+  elseif action == "hosts" then
+    cmd_open_custom_hosts()
   else
     Notify.error("Unknown action")
   end

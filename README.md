@@ -164,6 +164,7 @@ The `M s` menu provides access to all SSHFS functions:
 - `r` → Remove host
 - `h` → Go to mount home
 - `c` → Open ~/.ssh/config
+- `l` → Open custom host list
 
 > [!TIP]
 > `sshfs.yazi` uses the [array form for keymaps](https://yazi-rs.github.io/docs/configuration/keymap).
@@ -189,6 +190,7 @@ prepend_keymap = [
   { on = ["M","r"], run = "plugin sshfs -- remove",          desc = "Remove SSH host" },
   { on = ["M","h"], run = "plugin sshfs -- home",            desc = "Go to mount home" },
   { on = ["M","c"], run = "cd ~/.ssh/",                      desc = "Go to ssh config" },
+  { on = ["M","l"], run = "plugin sshfs -- hosts",           desc = "Open custom host list" },
 ]
 ```
 
@@ -206,6 +208,7 @@ prepend_keymap = [
   - **Add host (`M a`):** Enter a custom host (`user@host`) and optionally specify a remote directory (e.g., `/var/log`, `/etc/nginx`) to create an alias for that specific path. When you mount this alias later, it will go directly to that remote directory. This is useful for frequently accessed remote directories or quick testing. For persistent, system-wide access, updating your `.ssh/config` is recommended.
   - **Remove host (`M r`):** Select and remove any Yazi-only hosts that you've added.
   - **Jump to mount home directory (`M h`):** Jump to the mount home directory.
+  - **Open custom host list (`M l`):** Navigate to the directory containing your custom hosts file for direct editing.
 
 ## 💡 Tips and Performance
 
