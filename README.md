@@ -46,7 +46,7 @@ Perfect for tweaking configs, deploying sites, inspecting logs, or just grabbing
 
 ## 🧠 What it does under the hood
 
-This plugin serves as a wrapper for the `sshfs` command, integrating it seamlessly with Yazi. It automatically reads hosts from your `~/.ssh/config` file. Additionally, it maintains a separate list of custom hosts which is by default stored in `$XDG_DATA_HOME/yazi/sshfs.list`, or if `$XDG_DATA_HOME` is note defined, in `~/.local/share/yazi/sshfs.list`.
+This plugin serves as a wrapper for the `sshfs` command, integrating it seamlessly with Yazi. It automatically reads hosts from your `~/.ssh/config` file. Additionally, it maintains a separate list of custom hosts which is by default stored in `$XDG_DATA_HOME/yazi/sshfs.list` (or in `~/.local/share/yazi/sshfs.list` if `$XDG_DATA_HOME` is not defined).
 
 The core default `sshfs` command used is as follows (you may tweak these options and the mount directory with your setup settings):
 
