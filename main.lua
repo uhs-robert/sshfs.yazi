@@ -1332,6 +1332,7 @@ end
 
 ---Entry
 function M:entry(job)
+  if not get_state(STATE_KEY.CONFIG) then set_plugin_config() end
   if not init() then return end
 
   local action = job.args[1]
