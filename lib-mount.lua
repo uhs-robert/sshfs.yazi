@@ -28,7 +28,11 @@ local function get_sshfs_mounts(mount_dir)
   local root_pat = "^" .. mount_dir:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1") .. "/"
 
   -- Prefer findmnt on Linux
-  local child, _ = Command("findmnt"):arg({ "-t", "fuse.sshfs", "-o", "SOURCE,TARGET", "--noheadings", "-l" }):stdout(Command.PIPED):stderr(Command.PIPED):spawn()
+  local child, _ = Command("findmnt")
+    :arg({ "-t", "fuse.sshfs", "-o", "SOURCE,TARGET", "--noheadings", "-l" })
+    :stdout(Command.PIPED)
+    :stderr(Command.PIPED)
+    :spawn()
   if child then
     local output = child:wait_with_output()
     if output and output.status.success then
@@ -114,11 +118,20 @@ end
 ---@return boolean
 function MOUNT.remove(path, clean_dir)
   local attempts = {
+    -- 1. Clean
     { "fusermount", { "-u", path } },
     { "fusermount3", { "-u", path } },
-    { "umount", { "-l", path } },
     { "umount", { path } },
     { "diskutil", { "unmount", path } },
+
+    -- 2. Lazy
+    { "fusermount", { "-uz", path } },
+    { "fusermount3", { "-uz", path } },
+    { "umount", { "-l", path } },
+
+    -- 3. Force (macOS/Universal)
+    { "diskutil", { "unmount", "force", path } },
+    { "umount", { "-f", path } },
   }
   for _, cmd in ipairs(attempts) do
     local status, err = Command(cmd[1]):arg(cmd[2]):status()
