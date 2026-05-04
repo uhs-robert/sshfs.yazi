@@ -16,42 +16,17 @@
 <p align="center">
 A minimal, blazing fast <strong>SSHFS</strong> integration for the <a target="_blank" rel="noopener noreferrer" href="https://github.com/sxyazi/yazi">Yazi</a> terminal file‑manager.
 </p>
-
-<details align="center">
-<summary>✨ What's New / 🚨 Breaking Changes</summary>
-<br/>
-<!-- whats-new:start -->
-
-  <details>
-    <summary>🚨 v2.0: Custom host file relocated (migration required)</summary>
-    <!-- v2.0:start -->
-    <div align="left">
-      <h3>🚨 BREAKING CHANGE: <code>sshfs.list</code> relocated to follow XDG Base Directory spec</h3>
-      <p>
-        The custom hosts file has moved from <code>~/.config/yazi/sshfs.list</code> to
-        <code>$XDG_DATA_HOME/yazi/sshfs.list</code> (this is usually located in <code>~/.local/share/yazi/sshfs.list</code>).
-      </p>
-      <p><strong>If you have custom hosts saved, migrate your file before upgrading:</strong></p>
-      <pre>mv ~/.config/yazi/sshfs.list ~/.local/share/yazi/sshfs.list</pre>
-      <p>
-        If <code>$XDG_DATA_HOME</code> is set to a custom path, use that instead:
-      </p>
-      <pre>mv ~/.config/yazi/sshfs.list "$XDG_DATA_HOME/yazi/sshfs.list"</pre>
-      <p>
-        Hosts from <code>~/.ssh/config</code> are unaffected. Only manually added custom hosts need migration.
-        If you have no custom hosts then no action is needed.
-      </p>
-    </div>
-    <!-- v2.0:end -->
-
-  </details>
-
-<!-- whats-new:end -->
-</details>
+<p align="center">
+  <a href="./NEWS.md">✨ What's New / 🚨 Breaking Changes</a>
+</p>
 
 ## 🕶️ What does it do?
 
-Mount any host from your `~/.ssh/config`, or add custom hosts, and browse remote files as if they were local. Mount specific remote directories (like `/var/log` or `/etc`) or the entire home/root filesystem. Jump between your local machine and remote mounts with a single keystroke.
+sshfs.yazi mounts hosts from your SSH config and makes them feel local.
+
+You can **browse**, **search**, or **open SSH terminals** across multiple mounts from within Yazi. Uses sockets to persist your authentication/connections.
+
+Built using the best of both `sshfs` and `ssh` in tandem with your existing tools.
 
 <https://github.com/user-attachments/assets/b7ef109a-0941-4879-b15a-a343262f0967>
 
@@ -66,19 +41,24 @@ Mount any host from your `~/.ssh/config`, or add custom hosts, and browse remote
 >
 > If you have some Lua experience (or want to learn), I’d be happy to walk you through integration and testing. Pull requests are welcome!
 
-## 🤔 Why SSHFS?
+## ✨ Features
 
-- **Works anywhere you have SSH access.** Nothing extra is needed – only port 22.
-- **Treat remote files like local ones.** Run `vim`, `nvim`, `sed`, preview images / videos directly, etc.
-- **User‑space, unprivileged.** No root required; mounts live under your chosen mount directory or the default (`~/mnt`).
-- **Bandwidth‑friendly.** SSH compression, connection timeout, and reconnect options are enabled by default.
-- **Quick Loading and Operations.** Load / edit files quickly without any lag and use all the tools from your local machine.
-
-Perfect for tweaking configs, deploying sites, inspecting logs, or just grabbing / editing / deleting files remotely.
+- **Robust SSH config resolution** – Full support for `Include`, `Match`, `ProxyJump`, and hostname aliases via `ssh -G`.
+- **Interactive Authentication** – Handles passwords, 2FA, and host key verification by dropping you into a terminal shell when needed.
+- **Connection Pooling** – Leverages SSH `ControlMaster` sockets for persistent connections.
+- **Smart Path Selection** – Choose between home, root, or custom paths on the fly.
+- **Configurable Paths** – Define `global_paths` or per-host `host_paths` for quick access to frequently used remote directories.
+- **Integrated Picker** – Seamlessly switch between a which-key style menu, `fzf` (if installed), or a filterable list.
+- **Lifecycle Hooks** – Automatically jump to mounts on success and clean up empty mount directories on exit.
+- **SSH Terminal Shell** - After mount, use SSH `ControlMaster` socket to automatically drop into an SSH shell and back to yazi when done.
 
 ## 🧠 What it does under the hood
 
-This plugin serves as a wrapper for the `sshfs` command, integrating it seamlessly with Yazi. It automatically reads hosts from your `~/.ssh/config` file. Additionally, it maintains a separate list of custom hosts which is by default stored in `$XDG_DATA_HOME/yazi/sshfs.list` (or in `~/.local/share/yazi/sshfs.list` if `$XDG_DATA_HOME` is not defined).
+This plugin serves as a wrapper for the `sshfs` command, integrating it seamlessly with Yazi. It resolves host configurations using `ssh -G` to ensure full compatibility with complex SSH configs (including `Include`, `Match`, and `ProxyJump` directives).
+
+Authentication is handled interactively via a temporary terminal shell, which naturally supports passwords, 2FA, and host key verification. Once authenticated, the plugin establishes an SSH `ControlMaster` socket to persist the connection, allowing `sshfs` to mount instantly and subsequent operations to run without repeated prompts.
+
+The plugin automatically reads hosts from your `~/.ssh/config` file and maintains a separate list of custom hosts stored in `$XDG_DATA_HOME/yazi/sshfs.list` (or `~/.local/share/yazi/sshfs.list`).
 
 The core default `sshfs` command used is as follows (you may tweak these options and the mount directory with your setup settings):
 
@@ -89,13 +69,6 @@ sshfs user@host: ~/mnt/alias -o reconnect,compression=yes,ServerAliveInterval=15
 # Mount specific remote directory (when configured in alias)
 sshfs user@host:/var/log ~/mnt/alias-var-log -o reconnect,compression=yes,ServerAliveInterval=15,ServerAliveCountMax=3
 ```
-
-## ✨ Features
-
-- **One‑key mounting** – remembers your SSH hosts and reads from your `ssh_config`.
-- **Jump/Return workflow** – quickly copy files between local & remote.
-- Uses `sshfs` directly.
-- Mount‑points live under your chosen mount directory (default: `~/mnt`), keeping them isolated from your regular file hierarchy.
 
 ## 📋 Requirements
 
@@ -146,7 +119,7 @@ require("sshfs"):setup()
 
 ## 🎹 Key Mapping
 
-### 🗝️ Recommended: Preset
+### 🗝️ Recommended: Preset keybinds
 
 Add this to your `~/.config/yazi/keymap.toml` for a conflict-free approach that works well with other plugins:
 
@@ -161,7 +134,7 @@ The `M s` menu provides access to all SSHFS functions:
 
 - `m` → Mount & jump
 - `u` → Unmount
-- `j` → Jump to mount
+- `t` → Terminal
 - `a` → Add host
 - `r` → Remove host
 - `h` → Go to mount home
@@ -187,7 +160,7 @@ If you prefer direct keybinds, you may also set your own using our API. Here are
 prepend_keymap = [
   { on = ["M","m"], run = "plugin sshfs -- mount --jump",    desc = "Mount & jump" },
   { on = ["M","u"], run = "plugin sshfs -- unmount",         desc = "Unmount SSHFS" },
-  { on = ["M","j"], run = "plugin sshfs -- jump",            desc = "Jump to mount" },
+  { on = ["M","t"], run = "plugin sshfs -- terminal",        desc = "SSH Terminal" },
   { on = ["M","a"], run = "plugin sshfs -- add",             desc = "Add SSH host" },
   { on = ["M","r"], run = "plugin sshfs -- remove",          desc = "Remove SSH host" },
   { on = ["M","h"], run = "plugin sshfs -- home",            desc = "Go to mount home" },
@@ -197,16 +170,16 @@ prepend_keymap = [
 ```
 
 > [!IMPORTANT]
-> If you choose to use direct keybinds, you will be responsible for managing and handling any conflicts yourself.
+> If you choose to use direct keybinds, you will be responsible for managing and resolving any conflicts yourself.
 
 ## 🚀 Usage
 
 ### 📝 Example using the recommended preset
 
 - **SSHFS Menu (`M s`):** Opens an interactive menu with all SSHFS options
-  - **Mount (`M m`):** Choose a host and select a remote directory (`~` or `/`). This works for hosts from your `~/.ssh/config` and any custom hosts you've added. Custom hosts with specific remote paths configured will mount directly to that path.
+  - **Mount (`M m`):** Choose a host and select a remote directory (`~` home, `/` root, or **Custom path...** to type any arbitrary path like `/var/log` or `etc/nginx`). This works for hosts from your `~/.ssh/config` and any custom hosts you've added. Custom hosts with specific remote paths configured will mount directly to that path.
   - **Unmount (`M u`):** Choose an active mount to unmount it.
-  - **Jump to mount (`M j`):** Jump to any active mount from another tab or location
+  - **Terminal (`M t`):** Open an interactive SSH terminal to a mounted host.
   - **Add host (`M a`):** Enter a custom host (`user@host`) and optionally specify a remote directory (e.g., `/var/log`, `/etc/nginx`) to create an alias for that specific path. When you mount this alias later, it will go directly to that remote directory. This is useful for frequently accessed remote directories or quick testing. For persistent, system-wide access, updating your `.ssh/config` is recommended.
   - **Remove host (`M r`):** Select and remove any Yazi-only hosts that you've added.
   - **Jump to mount home directory (`M h`):** Jump to the mount home directory.
@@ -214,7 +187,7 @@ prepend_keymap = [
 
 ## 💡 Tips and Performance
 
-- If key authentication fails, the plugin will prompt for a password up to 3 times before giving up.
+- If automatic key authentication fails, the plugin will prompt for a password/2FA/etc interactively by dropping you into a terminal shell.
 - SSH keys vastly speed up repeated mounts (no password prompt), leverage your `ssh_config` rather than manually adding hosts to make this as easy as possible.
 - **User Selection**: By setting `default_user = "prompt"` in your configuration, you can choose which user to login as when mounting (SSH config user, root, or custom username). This is useful when you need to switch between different user contexts on the same host. The default setting (`"auto"`) respects your SSH config without prompting.
 
@@ -235,14 +208,36 @@ require("sshfs"):setup({
   -- Mount directory
   mount_dir = os.getenv("HOME") .. "/mnt",
 
-  -- Password authentication attempts before giving up
-  password_attempts = 3,
-
   -- Default mount point: Go to home, root, or always ask where to go
-  default_mount_point = "auto", -- home | root | auto
+  default_mount_point = "auto", -- "auto" | "home" | "root"
 
   -- Default user selection: Use SSH config user or prompt for choice
-  default_user = "auto", -- auto | prompt
+  default_user = "auto", -- "auto" | "prompt"
+
+  -- Remote paths offered to all hosts when mounting (in addition to ~ and /)
+  global_paths = {
+     -- Optionally define default mount paths for ALL hosts
+    -- These appear as options when connecting to any host
+    -- Examples:
+    -- "~/.config",
+    -- "/var/www",
+    -- "/srv",
+    -- "/opt"
+    -- "/var/log",
+    -- "/etc",
+    -- "/tmp",
+    -- "/usr/local",
+    -- "/data",
+    -- "/var/lib",
+  },
+
+  -- Per-host remote paths offered when mounting that host
+  host_paths = {
+    -- Optionally define default mount paths for specific hosts
+    -- These are shown in addition to global_paths
+    --   myserver = "/srv/www",
+    --   devbox   = { "/home/deploy", "/opt/app" },
+  },
 
   -- SSHFS mount options (array of strings)
   -- These options are passed directly to the sshfs command
@@ -260,6 +255,22 @@ require("sshfs"):setup({
     -- "follow_symlinks",             -- Follow symbolic links
   },
 
+  -- SSH ControlMaster connection reuse settings
+  connections = {
+    control_persist = "10m",                   -- How long to keep the master socket alive after last use
+    socket_dir = os.getenv("HOME") .. "/.ssh/sockets", -- Where ControlMaster sockets are stored
+  },
+
+  -- Behavior after a successful mount
+  on_mount = {
+    auto_jump = true, -- Jump to the mount directory automatically
+  },
+
+  -- Cleanup behavior after unmounting
+  on_exit = {
+    clean_mount_folders = true, -- Delete empty mount directories after unmounting
+  },
+
   -- Picker UI settings
   ui = {
     -- Maximum number of items to show in the menu picker.
@@ -267,9 +278,8 @@ require("sshfs"):setup({
     menu_max = 15, -- Recommended: 10–20. Max: 36.
 
     -- Picker strategy:
-    -- "auto": uses menu if items <= menu_max, otherwise fzf (if available) or a filterable list
-    -- "fzf": always use fzf if available, otherwise fallback to a filterable list
-    picker = "auto", -- "auto" | "fzf"
+    -- "auto":  uses menu if items <= menu_max, otherwise fzf (if available) or a filterable list
+    picker = "auto", -- "auto" | "fzf" | "menu"
   },
 })
 ```
