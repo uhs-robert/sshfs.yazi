@@ -61,29 +61,16 @@ local function find_existing_mount(hostname, mount_dir)
   return nil
 end
 
---- Resolve which remote paths to offer the user.
---- Merges global_paths and per-host paths from config.
----@param hostname string
----@param config table
----@return string[]
-local function get_configured_paths(hostname, config)
-  local paths = {}
-  if config.global_paths then
-    for _, p in ipairs(config.global_paths) do
-      paths[#paths + 1] = p
-    end
-  end
-  if config.host_paths and config.host_paths[hostname] then
-    local hp = config.host_paths[hostname]
-    if type(hp) == "string" then
-      paths[#paths + 1] = hp
-    else
-      for _, p in ipairs(hp) do
-        paths[#paths + 1] = p
-      end
-    end
-  end
-  return paths
+--- Normalize a user-typed remote path.
+--- Empty/blank → "/", "~"/"~/…" pass through, no leading "/" → prepend "/".
+---@param path string|nil
+---@return string
+local function normalize_remote_path(path)
+  if not path or path:match("^%s*$") then return "/" end
+  path = path:match("^%s*(.-)%s*$")
+  if path == "~" or path:match("^~/") then return path end
+  if path:sub(1, 1) ~= "/" then return "/" .. path end
+  return path
 end
 
 --- Called after a successful mount. Notifies the user and optionally jumps.
@@ -135,7 +122,54 @@ function SSHFS.mount(entry, opts)
   end
   local sock_path = Ssh.socket_path(alias, config)
 
-  -- Build mount point directory name
+  -- Determine remote path if not already set from the entry
+  local mount_to_root = false
+  if not remote_path then
+    local map = { root = true, home = false }
+    mount_to_root = map[config.default_mount_point]
+    if mount_to_root == nil then
+      local CUSTOM = "Custom path\xe2\x80\xa6"
+      local options = { "~ (home)", "/ (root)", CUSTOM }
+
+      if config.host_paths and config.host_paths[hostname] then
+        local hp = config.host_paths[hostname]
+        if type(hp) == "string" then
+          options[#options + 1] = hp
+        else
+          for _, p in ipairs(hp) do
+            options[#options + 1] = p
+          end
+        end
+      end
+
+      if config.global_paths then
+        for _, p in ipairs(config.global_paths) do
+          options[#options + 1] = p
+        end
+      end
+
+      local picker = require(".ui-picker")
+      local chosen = picker.choose("Mount where?", options, config)
+      if not chosen then return end
+
+      if chosen == "/ (root)" then
+        mount_to_root = true
+      elseif chosen == CUSTOM then
+        local typed = prompt.input("Remote path:")
+        if not typed then return end
+        local normalized = normalize_remote_path(typed)
+        if normalized == "/" then
+          mount_to_root = true
+        else
+          remote_path = normalized
+        end
+      elseif chosen ~= "~ (home)" then
+        remote_path = chosen
+      end
+    end
+  end
+
+  -- Build mount point directory name (remote path now known)
   local mount_point = remote_path and ("%s/%s-%s"):format(mount_dir, hostname, Hosts.mount_suffix(remote_path))
     or ("%s/%s"):format(mount_dir, hostname)
 
@@ -146,41 +180,6 @@ function SSHFS.mount(entry, opts)
   if Mount.is_active(mount_point, mount_url, mount_dir) then
     Notify.info("Already mounted at %s", mount_point)
     return finalize(entry, mount_point, config, opts.jump)
-  end
-
-  -- Determine remote path if not already set from the entry
-  local mount_to_root = false
-  if not remote_path then
-    local configured = get_configured_paths(hostname, config)
-    if #configured > 0 then
-      local picker = require(".ui-picker")
-      local options = { "~ (home)", "/ (root)" }
-      for _, p in ipairs(configured) do
-        options[#options + 1] = p
-      end
-      local chosen = picker.choose("Mount where?", options, config)
-      if not chosen then
-        fs.remove("dir_clean", mount_url)
-        return
-      end
-      if chosen == "/ (root)" then
-        mount_to_root = true
-      elseif chosen ~= "~ (home)" then
-        remote_path = chosen
-      end
-    else
-      local map = { root = true, home = false }
-      mount_to_root = map[config.default_mount_point]
-      if mount_to_root == nil then
-        mount_to_root = ya.which({
-          title = "Mount where?",
-          cands = {
-            { on = "1", desc = "Home directory (~)" },
-            { on = "2", desc = "Root directory (/)" },
-          },
-        }) == 2
-      end
-    end
   end
 
   -- Resolve remote home to handle symlinks / non-standard $HOME
