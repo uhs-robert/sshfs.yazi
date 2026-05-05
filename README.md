@@ -28,7 +28,7 @@ You can **browse**, **search**, or **open SSH terminals** across multiple mounts
 
 Built using the best of both `sshfs` and `ssh` in tandem with your existing tools.
 
-https://github.com/user-attachments/assets/edf20e10-445a-4461-af28-8bc86abad875
+<https://github.com/user-attachments/assets/fa4029d5-874e-47a1-b281-80b8ce42f860>
 
 > [!NOTE]
 >
