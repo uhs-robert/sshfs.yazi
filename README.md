@@ -22,24 +22,19 @@ A minimal, blazing fast <strong>SSHFS</strong> integration for the <a target="_b
 
 ## 🕶️ What does it do?
 
-sshfs.yazi mounts hosts from your SSH config and makes them feel local.
+sshfs.yazi mounts hosts from your SSH config and makes them accessible locally.
 
 You can **browse**, **search**, or **open SSH terminals** across multiple mounts from within Yazi. Uses sockets to persist your authentication/connections.
 
-Built using the best of both `sshfs` and `ssh` in tandem with your existing tools.
+Built using the best of both `SSHFS` and `SSH` in tandem with your existing tools.
 
 <https://github.com/user-attachments/assets/fa4029d5-874e-47a1-b281-80b8ce42f860>
 
 > [!NOTE]
 >
-> **Linux/Mac Only (for now!)**
+> **Linux/Mac Only**
 >
-> This plugin currently only supports Linux/Mac.
-> If you're interested in helping add support for other platforms, check out the open issues:
->
-> - [Add Windows support](https://github.com/uhs-robert/sshfs.yazi/issues/4)
->
-> If you have some Lua experience (or want to learn), I’d be happy to walk you through integration and testing. Pull requests are welcome!
+> This plugin currently only supports Linux/Mac. You can [help add Windows support](https://github.com/uhs-robert/sshfs.yazi/issues/4) if interested.
 
 ## ✨ Features
 
@@ -119,9 +114,9 @@ require("sshfs"):setup()
 
 ## 🎹 Key Mapping
 
-### 🗝️ Recommended: Preset keybinds
+### 🗝️ Recommended: Preset keymaps
 
-Add this to your `~/.config/yazi/keymap.toml` for a conflict-free approach that works well with other plugins:
+Add this to your `~/.config/yazi/keymap.toml` for a conflict-free approach that automatically picks up the latest updates and works well with your other plugins:
 
 ```toml
 [mgr]
@@ -142,18 +137,20 @@ The `M s` menu provides access to all SSHFS functions:
 - `l` → Open custom host list
 
 > [!TIP]
-> `sshfs.yazi` uses the [array form for keymaps](https://yazi-rs.github.io/docs/configuration/keymap).
+> The examples in this README all use the [array form for keymaps](https://yazi-rs.github.io/docs/configuration/keymap).
 > You must pick **only one style** per file; mixing with `[[mgr.prepend_keymap]]` will fail.
 >
-> **Also note:** some plugins (e.g., `mount.yazi`) bind a bare key like `on = "M"`,
-> which blocks all `M <key>` chords (including `M s`). Change those to chords
+> **Also note:** some plugins (e.g., `mount.yazi`) suggest binding a bare key like `on = "M"`,
+> which blocks all `M <key>` chords (including `M s`). You can change those to chords
 > (e.g. `["M","m"]`) or choose a different prefix.
 
 ---
 
-### 🛠️ Alternative: Custom direct keybinds
+### 🛠️ Alternative: Custom direct keymaps
 
-If you prefer direct keybinds, you may also set your own using our API. Here are the available options from the default preset:
+If you prefer fully custom and direct keymaps, you may also set your own using our API. Be sure to **watch** for new releases so you don't miss the latest features.
+
+Here are the available options from the default preset above:
 
 ```toml
 [mgr]
@@ -170,11 +167,11 @@ prepend_keymap = [
 ```
 
 > [!IMPORTANT]
-> If you choose to use direct keybinds, you will be responsible for managing and resolving any conflicts yourself.
+> If you choose to use direct keymaps, you will be responsible for managing and resolving any conflicts yourself.
 
 ## 🚀 Usage
 
-### 📝 Example using the recommended preset
+### 📝 Example using the default recommended preset
 
 - **SSHFS Menu (`M s`):** Opens an interactive menu with all SSHFS options
   - **Mount (`M m`):** Choose a host and select a remote directory (`~` home, `/` root, or **Custom path...** to type any arbitrary path like `/var/log` or `etc/nginx`). This works for hosts from your `~/.ssh/config` and any custom hosts you've added. Custom hosts with specific remote paths configured will mount directly to that path.
@@ -194,9 +191,8 @@ prepend_keymap = [
 ## ⚙️ Configuration
 
 > [!WARNING]
-> This section is intended for power users only.
+> This section is intended for power users (which should be _all of you_ since you're using SSH).
 > Skip this if you only want to run the default settings.
-> Keep reading for advanced SSHFS customization and plugin configuration options.
 
 To customize plugin behavior, you may pass a config table to `setup()` (default settings are displayed for optional configuration):
 
@@ -211,7 +207,7 @@ require("sshfs"):setup({
   -- Default mount point: Go to home, root, or always ask where to go
   default_mount_point = "auto", -- "auto" | "home" | "root"
 
-  -- Default user selection: Use SSH config user or prompt for choice
+  -- Default user selection: Use SSH config user or prompt for choice (useful with multiple users per host)
   default_user = "auto", -- "auto" | "prompt"
 
   -- Remote paths offered to all hosts when mounting (in addition to ~ and /)
@@ -257,7 +253,7 @@ require("sshfs"):setup({
 
   -- SSH ControlMaster connection reuse settings
   connections = {
-    control_persist = "10m",                   -- How long to keep the master socket alive after last use
+    control_persist = "10m",                           -- How long to keep the master socket alive after last use
     socket_dir = os.getenv("HOME") .. "/.ssh/sockets", -- Where ControlMaster sockets are stored
   },
 
