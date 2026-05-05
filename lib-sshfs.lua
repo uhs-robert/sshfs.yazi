@@ -68,7 +68,8 @@ end
 local function normalize_remote_path(path)
   if not path or path:match("^%s*$") then return "/" end
   path = path:match("^%s*(.-)%s*$")
-  if path == "~" or path:match("^~/") then return path end
+  if path == "~" then return "/" end -- sshfs doesn't expand ~, default dir resolves relative to home
+  if path:match("^~/") then return path:sub(3) end
   if path:sub(1, 1) ~= "/" then return "/" .. path end
   return path
 end
