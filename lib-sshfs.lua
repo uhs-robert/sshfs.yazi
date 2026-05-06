@@ -135,17 +135,17 @@ function SSHFS.mount(entry, opts)
       if config.host_paths and config.host_paths[hostname] then
         local hp = config.host_paths[hostname]
         if type(hp) == "string" then
-          options[#options + 1] = hp
+          options[#options + 1] = normalize_remote_path(hp)
         else
           for _, p in ipairs(hp) do
-            options[#options + 1] = p
+            options[#options + 1] = normalize_remote_path(p)
           end
         end
       end
 
       if config.global_paths then
         for _, p in ipairs(config.global_paths) do
-          options[#options + 1] = p
+          options[#options + 1] = normalize_remote_path(p)
         end
       end
 
