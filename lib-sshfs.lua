@@ -168,6 +168,7 @@ function SSHFS.mount(entry, opts)
         remote_path = chosen
       end
     end
+    mount_to_root = mount_to_root or false
   end
 
   -- Build mount point directory name (remote path now known)
