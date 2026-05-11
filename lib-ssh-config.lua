@@ -30,31 +30,4 @@ function SSHCONFIG.list_hosts()
   return list
 end
 
---- Resolve the full SSH config for a hostname via `ssh -G`.
---- Returns a table of key/value pairs (HostName, User, Port, etc.)
---- This correctly handles Include, Match, ProxyJump, and HostName aliases.
----@param hostname string
----@return table<string, string>
-function SSHCONFIG.resolve(hostname)
-  local child, spawn_err = Command("ssh"):arg({ "-G", hostname }):stdout(Command.PIPED):stderr(Command.PIPED):spawn()
-  if not child then
-    local Notify = require(".lib-notify")
-    Notify.debug("ssh -G failed for %s: %s", hostname, tostring(spawn_err))
-    return {}
-  end
-  local output = child:wait_with_output()
-  if not output or not output.status.success then
-    local Notify = require(".lib-notify")
-    Notify.debug("ssh -G failed for %s", hostname)
-    return {}
-  end
-
-  local result = {}
-  for line in output.stdout:gmatch("[^\r\n]+") do
-    local key, value = line:match("^(%S+)%s+(.+)$")
-    if key then result[key:lower()] = value end
-  end
-  return result
-end
-
 return SSHCONFIG
