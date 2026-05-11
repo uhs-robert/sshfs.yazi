@@ -185,6 +185,7 @@ prepend_keymap = [
 ## 💡 Tips and Performance
 
 - If automatic key authentication fails, the plugin will prompt for a password/2FA/etc interactively by dropping you into a terminal shell.
+- If at all possible, use the exact path that you want to read/edit as this will limit the amount of files that SSHFS needs to load for better performance.
 - SSH keys vastly speed up repeated mounts (no password prompt), leverage your `ssh_config` rather than manually adding hosts to make this as easy as possible.
 - **User Selection**: By setting `default_user = "prompt"` in your configuration, you can choose which user to login as when mounting (SSH config user, root, or custom username). This is useful when you need to switch between different user contexts on the same host. The default setting (`"auto"`) respects your SSH config without prompting.
 
