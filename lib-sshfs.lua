@@ -198,8 +198,9 @@ function SSHFS.mount(entry, opts)
     end
   end
 
-  -- Mount via ControlMaster socket
-  local key_err, _ = try_key_auth(alias, mount_point, mount_to_root, remote_path, config, sock_path)
+  -- Custom hosts with explicit user@ bypass the ControlMaster
+  local effective_sock = alias:match("^[^@]+@") and nil or sock_path
+  local key_err, _ = try_key_auth(alias, mount_point, mount_to_root, remote_path, config, effective_sock)
   if not key_err then
     local Lockfile = require(".lib-lockfile")
     Lockfile.acquire(hostname)

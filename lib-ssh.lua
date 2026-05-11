@@ -92,7 +92,6 @@ function SSH.open_auth_terminal(host, config)
   local persist = (config.connections and config.connections.control_persist) or "10m"
   local sock = SSH.socket_path(host, config)
 
-  local hostname = host:match("@(.+)$") or host
   local permit = ui.hide()
 
   local status, err = Command("ssh")
@@ -104,7 +103,7 @@ function SSH.open_auth_terminal(host, config)
       "ControlPath=" .. sock,
       "-o",
       "ControlPersist=" .. persist,
-      hostname,
+      host,
       "exit",
     })
     :stdin(Command.INHERIT)
