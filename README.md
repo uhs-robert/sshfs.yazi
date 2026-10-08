@@ -69,7 +69,7 @@ sshfs user@host:/var/log ~/mnt/alias-var-log -o reconnect,compression=yes,Server
 
 | Software   | Minimum       | Notes                               |
 | ---------- | ------------- | ----------------------------------- |
-| Yazi       | `>=25.5.31`   | untested on 25.6+                   |
+| Yazi       | `>=25.5.31`   |                                     |
 | sshfs      | any           | `sudo dnf/apt/pacman install sshfs` |
 | fusermount | from FUSE     | Usually pre-installed on Linux      |
 | SSH config | working hosts | Hosts come from `~/.ssh/config`     |
