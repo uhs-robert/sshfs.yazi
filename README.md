@@ -70,6 +70,7 @@ sshfs user@host:/var/log ~/mnt/alias-var-log -o reconnect,compression=yes,Server
 | Software   | Minimum       | Notes                                            |
 | ---------- | ------------- | ------------------------------------------------ |
 | Yazi       | `>=25.12.29`  | Older builds can't load the plugin's sub-modules |
+| ya         | `>=25.12.29`  | Older builds only install `main.lua`             |
 | sshfs      | any           | `sudo dnf/apt/pacman install sshfs`              |
 | fusermount | from FUSE     | Usually pre-installed on Linux                   |
 | SSH config | working hosts | Hosts come from `~/.ssh/config`                  |
