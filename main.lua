@@ -1,3 +1,4 @@
+--- @since 26.1.22
 -- main.lua
 local M = {}
 
