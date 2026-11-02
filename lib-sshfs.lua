@@ -74,7 +74,10 @@ local function replace_unresponsive_mount(mount_path, hostname, config)
   local Mount = require(".lib-mount")
   Notify.warn("Mount at %s is not responding, remounting", mount_path)
   State.redirect_tabs_to_home(mount_path)
-  if not Mount.remove(mount_path, false) then
+  -- Remove the folder too. Yazi caches the dead mount's error listing for this
+  -- path, and a mount on top of the folder sends no watcher event to clear it.
+  -- Deleting the folder does, and the mount below creates it again.
+  if not Mount.remove(mount_path, true) then
     Notify.error("Failed to unmount unresponsive mount at %s", mount_path)
     return false
   end
