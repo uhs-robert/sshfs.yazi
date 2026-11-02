@@ -9,6 +9,7 @@ local DISCONNECTED_ERRORS = {
   "Transport endpoint is not connected",
   "Input/output error",
   "Software caused connection abort",
+  "Device not configured", -- macFUSE reports a dead mount as ENXIO
 }
 
 --- Parse `mount` output for sshfs entries under a given root directory.
