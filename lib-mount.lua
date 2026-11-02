@@ -2,6 +2,9 @@
 
 local MOUNT = {}
 
+local RESPONSIVE_TIMEOUT_MS = 3000
+local READ_EVENT_TIMEOUT = 3 -- event code from Child:read_line_with
+
 --- Parse `mount` output for sshfs entries under a given root directory.
 ---@param mount_output string
 ---@param root string
@@ -72,6 +75,24 @@ function MOUNT.is_active(path, url, mount_dir)
   end
   -- Last resort: non-empty directory implies something is mounted
   return not Fs.is_dir_empty(url)
+end
+
+--- Return true if an active mount still answers file operations.
+--- After a network drop the mount table still lists the mount, but its reads fail
+--- or hang. A hung FUSE read through `fs.*` blocks the plugin with no way out, so
+--- the read runs in a child process with a timeout.
+---@param path string
+---@return boolean
+function MOUNT.is_responsive(path)
+  local child =
+    Command("sh"):arg({ "-c", 'ls -A -- "$1" >/dev/null && echo ok', "sh", path }):stdout(Command.PIPED):spawn()
+  if not child then return false end
+  local line, event = child:read_line_with({ timeout = RESPONSIVE_TIMEOUT_MS })
+  if event == READ_EVENT_TIMEOUT then
+    child:start_kill()
+    return false
+  end
+  return line ~= nil and line:match("^ok") ~= nil
 end
 
 --- List all active sshfs mounts under mount_dir.

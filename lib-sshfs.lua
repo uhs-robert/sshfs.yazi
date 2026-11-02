@@ -61,6 +61,27 @@ local function find_existing_mount(hostname, mount_dir)
   return nil
 end
 
+--- Unmount an unresponsive mount and close its master socket so it can be mounted again.
+--- After a network drop the mount stays in the mount table until unmounted. If its
+--- master socket hangs too, a new mount through that socket also hangs.
+---@param mount_path string mount point that failed Mount.is_responsive
+---@param hostname string
+---@param config table
+---@return boolean freed true if the host is free for a new mount
+local function replace_unresponsive_mount(mount_path, hostname, config)
+  local Notify = require(".lib-notify")
+  local State = require(".lib-state")
+  local Mount = require(".lib-mount")
+  Notify.warn("Mount at %s is not responding, remounting", mount_path)
+  State.redirect_tabs_to_home(mount_path)
+  if not Mount.remove(mount_path, false) then
+    Notify.error("Failed to unmount unresponsive mount at %s", mount_path)
+    return false
+  end
+  require(".lib-ssh").close_socket(hostname, config)
+  return true
+end
+
 --- Normalize a user-typed remote path.
 --- Empty/blank → "/", "~"/"~/…" pass through, no leading "/" → prepend "/".
 ---@param path string|nil
@@ -105,8 +126,11 @@ function SSHFS.mount(entry, opts)
 
   local existing = find_existing_mount(hostname, mount_dir)
   if existing then
-    Notify.warn("Host %s already mounted at %s — unmount it first", hostname, existing)
-    return
+    if require(".lib-mount").is_responsive(existing) then
+      Notify.warn("Host %s already mounted at %s — unmount it first", hostname, existing)
+      return
+    end
+    if not replace_unresponsive_mount(existing, hostname, config) then return end
   end
 
   -- Prompt for user if configured
