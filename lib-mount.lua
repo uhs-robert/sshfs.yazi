@@ -98,10 +98,13 @@ function MOUNT.is_responsive(path)
   local child = Command("stat"):arg({ "--", probe_path }):env("LC_ALL", "C"):stderr(Command.PIPED):spawn()
   if not child then return true end
   local stderr_line, event = child:read_line_with({ timeout = RESPONSIVE_TIMEOUT_MS })
+  local Notify = require(".lib-notify")
   if event == READ_EVENT_TIMEOUT then
     child:start_kill()
+    Notify.debug("Probe of %s timed out", path)
     return false
   end
+  Notify.debug("Probe of %s: %s", path, stderr_line or "no error")
   for _, error_text in ipairs(DISCONNECTED_ERRORS) do
     if stderr_line and stderr_line:find(error_text, 1, true) then return false end
   end
@@ -170,6 +173,7 @@ function MOUNT.remove(path, clean_dir)
   for _, cmd in ipairs(attempts) do
     local status, err = Command(cmd[1]):arg(cmd[2]):status()
     if err == nil and status and status.success then
+      require(".lib-notify").debug("Unmounted %s with %s %s", path, cmd[1], table.concat(cmd[2], " "))
       if clean_dir then fs.remove("dir_clean", Url(path)) end
       return true
     end
