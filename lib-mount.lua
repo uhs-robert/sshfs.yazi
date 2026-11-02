@@ -4,6 +4,12 @@ local MOUNT = {}
 
 local RESPONSIVE_TIMEOUT_MS = 3000
 local READ_EVENT_TIMEOUT = 3 -- event code from Child:read_line_with
+-- strerror texts (C locale) that mean the mount lost its connection to the server
+local DISCONNECTED_ERRORS = {
+  "Transport endpoint is not connected",
+  "Input/output error",
+  "Software caused connection abort",
+}
 
 --- Parse `mount` output for sshfs entries under a given root directory.
 ---@param mount_output string
@@ -77,22 +83,29 @@ function MOUNT.is_active(path, url, mount_dir)
   return not Fs.is_dir_empty(url)
 end
 
---- Return true if an active mount still answers file operations.
---- After a network drop the mount table still lists the mount, but its reads fail
---- or hang. A hung FUSE read through `fs.*` blocks the plugin with no way out, so
---- the read runs in a child process with a timeout.
+--- Return false only when an active mount is known to have lost its server.
+--- After a network drop the mount table still lists the mount, but its requests
+--- fail or hang. The probe looks up a random name, which sshfs cannot answer from
+--- its listing cache, so only the server can answer. A missing file or a denied
+--- permission is still an answer. Only a disconnect error or a timeout counts as
+--- dead, so an unclear result never leads to an unmount.
+--- A hung FUSE request through `fs.*` blocks the plugin with no way out, so the
+--- lookup runs in a child process with a timeout.
 ---@param path string
 ---@return boolean
 function MOUNT.is_responsive(path)
-  local child =
-    Command("sh"):arg({ "-c", 'ls -A -- "$1" >/dev/null && echo ok', "sh", path }):stdout(Command.PIPED):spawn()
-  if not child then return false end
-  local line, event = child:read_line_with({ timeout = RESPONSIVE_TIMEOUT_MS })
+  local probe_path = ("%s/.sshfs-probe-%d-%d"):format(path, os.time(), math.random(1, 1e9))
+  local child = Command("stat"):arg({ "--", probe_path }):env("LC_ALL", "C"):stderr(Command.PIPED):spawn()
+  if not child then return true end
+  local stderr_line, event = child:read_line_with({ timeout = RESPONSIVE_TIMEOUT_MS })
   if event == READ_EVENT_TIMEOUT then
     child:start_kill()
     return false
   end
-  return line ~= nil and line:match("^ok") ~= nil
+  for _, error_text in ipairs(DISCONNECTED_ERRORS) do
+    if stderr_line and stderr_line:find(error_text, 1, true) then return false end
+  end
+  return true
 end
 
 --- List all active sshfs mounts under mount_dir.
