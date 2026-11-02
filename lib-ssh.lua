@@ -27,6 +27,23 @@ function SSH.socket_path(host, config)
   return socket_dir(config) .. "/" .. name .. ".socket"
 end
 
+--- Return `-o` arguments for the ServerAlive* entries in config.sshfs_options.
+--- sshfs mounts through the master socket, and a multiplexed client ignores
+--- ServerAlive*, so the configured values only take effect on the master. Without
+--- them a master can hang for hours after a network drop and block reconnect.
+---@param config table
+---@return string[]
+local function keepalive_args(config)
+  local args = {}
+  for _, opt in ipairs(config.sshfs_options or {}) do
+    if opt:match("^ServerAlive%w+=") then
+      args[#args + 1] = "-o"
+      args[#args + 1] = opt
+    end
+  end
+  return args
+end
+
 --- Return true if the ControlMaster socket for `host` is alive.
 ---@param host string
 ---@param config table
@@ -54,20 +71,23 @@ function SSH.ensure_socket(host, config)
   local sock = SSH.socket_path(host, config)
   local hostname = host:match("@(.+)$") or host
 
-  local status, err = Command("ssh"):arg({
-    "-M",
-    "-N",
-    "-f",
-    "-o",
-    "ControlMaster=yes",
-    "-o",
-    "ControlPath=" .. sock,
-    "-o",
-    "ControlPersist=" .. persist,
-    "-o",
-    "BatchMode=yes",
-    hostname,
-  }):status()
+  local status, err = Command("ssh")
+    :arg(keepalive_args(config))
+    :arg({
+      "-M",
+      "-N",
+      "-f",
+      "-o",
+      "ControlMaster=yes",
+      "-o",
+      "ControlPath=" .. sock,
+      "-o",
+      "ControlPersist=" .. persist,
+      "-o",
+      "BatchMode=yes",
+      hostname,
+    })
+    :status()
 
   local ok = err == nil and status.success
 
@@ -95,6 +115,7 @@ function SSH.open_auth_terminal(host, config)
   local permit = ui.hide()
 
   local status, err = Command("ssh")
+    :arg(keepalive_args(config))
     :arg({
       "-M",
       "-o",
