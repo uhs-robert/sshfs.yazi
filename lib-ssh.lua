@@ -27,7 +27,7 @@ function SSH.socket_path(host, config)
   return socket_dir(config) .. "/" .. name .. ".socket"
 end
 
---- Return `-o` arguments for the ServerAlive* entries in config.sshfs_options.
+--- Return `-o` arguments for the ServerAlive* options in config.sshfs_options.
 --- sshfs mounts through the master socket, and a multiplexed client ignores
 --- ServerAlive*, so the configured values only take effect on the master. Without
 --- them a master can hang for hours after a network drop and block reconnect.
@@ -35,10 +35,14 @@ end
 ---@return string[]
 local function keepalive_args(config)
   local args = {}
-  for _, opt in ipairs(config.sshfs_options or {}) do
-    if opt:match("^ServerAlive%w+=") then
-      args[#args + 1] = "-o"
-      args[#args + 1] = opt
+  for _, entry in ipairs(config.sshfs_options or {}) do
+    -- sshfs accepts several options in one comma-separated entry, but ssh takes
+    -- one per -o. Option names are case-insensitive in both.
+    for opt in entry:gmatch("[^,]+") do
+      if opt:lower():match("^serveralive%w+=") then
+        args[#args + 1] = "-o"
+        args[#args + 1] = opt
+      end
     end
   end
   return args
